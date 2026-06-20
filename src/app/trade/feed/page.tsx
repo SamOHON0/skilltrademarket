@@ -5,9 +5,23 @@ import UnlockButton from "./UnlockButton";
 
 export const metadata = { title: "Job feed | Skill Trade" };
 
-// DEMO MODE: until Supabase Auth is wired, pick a trade with ?as=trade-1|trade-2|trade-3.
-// trade-1 Elite plumber (Dublin/Meath), trade-2 Pro electrician (Dublin/Kildare),
-// trade-3 Basic painter (Kildare/Dublin/Wicklow). Tier release windows apply for real.
+// DEMO MODE: until Supabase Auth is wired, pick a trade with ?as=<id>.
+// Elite plumber (Dublin/Meath), Pro electrician (Dublin/Kildare),
+// Basic painter (Kildare/Dublin/Wicklow). Tier release windows apply for real.
+// IDs differ by data source: mock uses trade-1/2/3, the live DB uses the UUIDs
+// from supabase/seed_dev.sql.
+const DEMO_TRADES =
+  process.env.DATA_SOURCE === "supabase"
+    ? [
+        { id: "11111111-1111-1111-1111-111111111111", label: "Plumber" },
+        { id: "22222222-2222-2222-2222-222222222222", label: "Electrician" },
+        { id: "33333333-3333-3333-3333-333333333333", label: "Painter" },
+      ]
+    : [
+        { id: "trade-1", label: "trade-1" },
+        { id: "trade-2", label: "trade-2" },
+        { id: "trade-3", label: "trade-3" },
+      ];
 
 export default async function FeedPage({
   searchParams,
@@ -15,7 +29,7 @@ export default async function FeedPage({
   searchParams: Promise<{ as?: string }>;
 }) {
   const { as } = await searchParams;
-  const tradeId = as ?? "trade-1";
+  const tradeId = as ?? DEMO_TRADES[0].id;
   const store = getDataStore();
   const trade = await store.getTrade(tradeId);
   const feed = trade ? await store.getFeed(tradeId) : [];
@@ -42,13 +56,13 @@ export default async function FeedPage({
         </div>
         <div className="text-xs text-ink/50">
           Demo as:{" "}
-          {["trade-1", "trade-2", "trade-3"].map((id) => (
+          {DEMO_TRADES.map((t) => (
             <Link
-              key={id}
-              href={`/trade/feed?as=${id}`}
-              className={`ml-1 underline ${id === tradeId ? "font-bold text-ink" : ""}`}
+              key={t.id}
+              href={`/trade/feed?as=${t.id}`}
+              className={`ml-1 underline ${t.id === tradeId ? "font-bold text-ink" : ""}`}
             >
-              {id}
+              {t.label}
             </Link>
           ))}
         </div>

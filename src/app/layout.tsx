@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Archivo, Inter } from "next/font/google";
 import "./globals.css";
+
+const archivo = Archivo({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-archivo",
+});
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "Skill Trade | Post a job, get matched with local trades",
@@ -12,11 +20,14 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${archivo.variable} ${inter.variable}`}>
       <body className="min-h-screen flex flex-col antialiased">
         <header className="bg-ink text-white">
           <nav className="mx-auto max-w-6xl px-4 h-16 flex items-center justify-between">
-            <Link href="/" className="text-xl font-bold tracking-tight">
+            <Link
+              href="/"
+              className="text-xl font-extrabold uppercase tracking-tight font-[family-name:var(--font-archivo)]"
+            >
               Skill<span className="text-accent">Trade</span>
             </Link>
             <div className="flex items-center gap-5 text-sm">

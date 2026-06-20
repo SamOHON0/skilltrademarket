@@ -3,9 +3,21 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getDataStore } from "@/lib/data";
-import type { ContactMethod, JobUrgency, NewJobInput, UnlockOutcome } from "@/lib/types";
+import type {
+  ContactMethod,
+  JobUrgency,
+  NewJobInput,
+  Tier,
+  TradeStatus,
+  UnlockOutcome,
+} from "@/lib/types";
 
-export async function submitJob(formData: FormData) {
+export type JobFormState = { error?: string };
+
+export async function submitJob(
+  _prev: JobFormState,
+  formData: FormData
+): Promise<JobFormState> {
   const answers: Record<string, string> = {};
   for (const [key, value] of formData.entries()) {
     if (key.startsWith("answer_") && typeof value === "string") {
@@ -31,12 +43,16 @@ export async function submitJob(formData: FormData) {
     consentReviewContact: formData.get("consentReviewContact") === "on",
   };
 
-  if (!input.category || !input.title || !input.county || !input.customerName || !input.customerPhone || !input.customerEmail) {
-    throw new Error("Missing required fields");
-  }
-  if (!input.consentShareContact) {
-    throw new Error("Consent to share contact details is required");
-  }
+  if (!input.category) return { error: "Pick a trade category." };
+  if (!input.title.trim()) return { error: "Give the job a short title." };
+  if (!input.county) return { error: "Choose the county the job is in." };
+  if (!input.customerName.trim()) return { error: "Add your name." };
+  if (!input.customerPhone.trim() && !input.customerEmail.trim())
+    return { error: "Add a phone number or email so trades can reach you." };
+  if (input.customerEmail && !input.customerEmail.includes("@"))
+    return { error: "That email address does not look right." };
+  if (!input.consentShareContact)
+    return { error: "You need to agree to share your details with matched trades." };
 
   const job = await getDataStore().createJob(input);
   redirect(`/jobs/${job.manageToken}`);
@@ -47,6 +63,22 @@ export async function unlockJobAction(jobId: string, tradeId: string) {
   revalidatePath("/trade/feed");
   return result;
 }
+
+// ---------- customer self-service (via manage token) ----------
+
+export async function cancelJobAction(formData: FormData) {
+  const token = String(formData.get("token"));
+  await getDataStore().cancelJobByToken(token);
+  revalidatePath(`/jobs/${token}`);
+}
+
+export async function completeJobAction(formData: FormData) {
+  const token = String(formData.get("token"));
+  await getDataStore().completeJobByToken(token);
+  revalidatePath(`/jobs/${token}`);
+}
+
+// ---------- admin: jobs ----------
 
 export async function approveJobAction(formData: FormData) {
   await getDataStore().approveJob(String(formData.get("jobId")));
@@ -64,4 +96,33 @@ export async function setOutcomeAction(formData: FormData) {
     String(formData.get("outcome")) as UnlockOutcome
   );
   revalidatePath("/trade/feed");
+}
+
+// ---------- admin: trades ----------
+
+export async function setTradeStatusAction(formData: FormData) {
+  await getDataStore().setTradeStatus(
+    String(formData.get("tradeId")),
+    String(formData.get("status")) as TradeStatus
+  );
+  revalidatePath("/admin/trades");
+  revalidatePath("/admin");
+}
+
+export async function setTradeTierAction(formData: FormData) {
+  await getDataStore().setTradeTier(
+    String(formData.get("tradeId")),
+    String(formData.get("tier")) as Tier
+  );
+  revalidatePath("/admin/trades");
+  revalidatePath("/admin");
+}
+
+export async function setTradeVerifiedAction(formData: FormData) {
+  await getDataStore().setTradeVerified(
+    String(formData.get("tradeId")),
+    formData.get("verified") === "true"
+  );
+  revalidatePath("/admin/trades");
+  revalidatePath("/admin");
 }

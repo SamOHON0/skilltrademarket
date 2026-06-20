@@ -91,6 +91,13 @@ export interface Unlock {
   outcome: UnlockOutcome;
 }
 
+/** Public-safe view of a trade that has claimed a job, shown to the customer. */
+export interface JobClaimant {
+  businessName: string;
+  tier: Tier;
+  verified: boolean;
+}
+
 export interface Review {
   id: string;
   jobId: string;

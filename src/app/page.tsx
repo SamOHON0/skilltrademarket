@@ -8,9 +8,9 @@ export default async function Home() {
     <>
       <section className="bg-ink text-white">
         <div className="mx-auto max-w-6xl px-4 py-20 md:py-28">
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight max-w-3xl">
-            Need a job done? Get matched with{" "}
-            <span className="text-accent">local trades</span> who actually want it.
+          <h1 className="shout text-4xl md:text-6xl max-w-3xl leading-[0.95]">
+            No dead leads.{" "}
+            <span className="text-accent">No hidden fees.</span> Just jobs.
           </h1>
           <p className="mt-6 text-lg text-white/80 max-w-2xl">
             Post your job free in two minutes. Up to five vetted local
@@ -35,7 +35,7 @@ export default async function Home() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4 py-16">
-        <h2 className="text-2xl font-bold">How it works</h2>
+        <h2 className="shout text-2xl">How it works</h2>
         <div className="mt-8 grid gap-8 md:grid-cols-3">
           {[
             ["1. Tell us the job", "A short guided form captures what you need, where, and when. The more detail, the better the match."],
@@ -51,7 +51,7 @@ export default async function Home() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4 pb-20">
-        <h2 className="text-2xl font-bold">What do you need done?</h2>
+        <h2 className="shout text-2xl">What do you need done?</h2>
         <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
           {categories.map((c) => (
             <Link

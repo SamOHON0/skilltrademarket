@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getDataStore } from "@/lib/data";
-import { URGENCY_LABELS } from "@/lib/constants";
+import { URGENCY_LABELS, TIER_LABELS } from "@/lib/constants";
+import { cancelJobAction, completeJobAction } from "@/app/actions";
 
 export const metadata = { title: "Your job | Skill Trade" };
 
@@ -13,7 +14,7 @@ const STATUS_COPY: Record<string, string> = {
   expired:
     "This job expired without being claimed. You can post it again with more detail or a wider area.",
   completed: "This job is marked complete. Thanks for using Skill Trade.",
-  removed: "This job was removed. Contact us if you think that is a mistake.",
+  removed: "This job was cancelled. Contact us if you think that is a mistake.",
 };
 
 export default async function ManageJobPage({
@@ -22,8 +23,16 @@ export default async function ManageJobPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const job = await getDataStore().getJobByToken(token);
+  const store = getDataStore();
+  const job = await store.getJobByToken(token);
   if (!job) notFound();
+
+  const claimants = await store.getJobClaimants(job.id);
+  const canCancel =
+    job.status === "pending_review" ||
+    job.status === "live" ||
+    job.status === "fully_claimed";
+  const canComplete = job.status === "live" || job.status === "fully_claimed";
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
@@ -48,10 +57,56 @@ export default async function ManageJobPage({
         </dl>
       </div>
 
+      {claimants.length > 0 && (
+        <div className="mt-6 rounded-xl bg-white p-6 shadow-sm">
+          <h2 className="font-semibold">Trades who have your details</h2>
+          <p className="mt-1 text-sm text-ink/60">
+            These businesses claimed your job and will be in touch. Expect them
+            to contact you the way you asked.
+          </p>
+          <ul className="mt-4 space-y-2">
+            {claimants.map((c, i) => (
+              <li
+                key={i}
+                className="flex items-center gap-2 text-sm font-medium"
+              >
+                {c.businessName}
+                {c.verified && (
+                  <span className="rounded-full bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5">
+                    Verified
+                  </span>
+                )}
+                <span className="text-ink/40">{TIER_LABELS[c.tier]}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(canComplete || canCancel) && (
+        <div className="mt-6 flex flex-wrap gap-3">
+          {canComplete && (
+            <form action={completeJobAction}>
+              <input type="hidden" name="token" value={token} />
+              <button className="rounded-lg bg-ink text-white px-4 py-2.5 text-sm font-semibold hover:bg-ink-light">
+                Mark job as done
+              </button>
+            </form>
+          )}
+          {canCancel && (
+            <form action={cancelJobAction}>
+              <input type="hidden" name="token" value={token} />
+              <button className="rounded-lg border border-red-300 text-red-700 px-4 py-2.5 text-sm font-semibold hover:bg-red-50">
+                Cancel this job
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
       <p className="mt-6 text-sm text-ink/60">
-        Bookmark this page. It is your private link to manage this job and
-        leave a review once the work is done. Reviews open after completion
-        (Phase 4).
+        Bookmark this page. It is your private link to manage this job and leave
+        a review once the work is done. Reviews open after completion (Phase 4).
       </p>
     </div>
   );

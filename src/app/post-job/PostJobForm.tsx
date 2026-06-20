@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { submitJob } from "../actions";
+import { useActionState, useState } from "react";
+import { submitJob, type JobFormState } from "../actions";
 import { BUDGET_BANDS, COUNTIES, URGENCY_LABELS } from "@/lib/constants";
 import type { TradeCategory } from "@/lib/types";
 
@@ -23,9 +23,13 @@ export default function PostJobForm({
     categories.some((c) => c.slug === initialCategory) ? initialCategory! : ""
   );
   const selected = categories.find((c) => c.slug === category);
+  const [state, formAction, isPending] = useActionState<JobFormState, FormData>(
+    submitJob,
+    {}
+  );
 
   return (
-    <form action={submitJob} className="space-y-6">
+    <form action={formAction} className="space-y-6">
       {/* Progress */}
       <ol className="flex gap-1.5">
         {STEPS.map((label, i) => (
@@ -221,12 +225,19 @@ export default function PostJobForm({
         ) : (
           <button
             type="submit"
-            className="rounded-lg bg-accent hover:bg-accent-dark text-ink px-5 py-2.5 font-semibold"
+            disabled={isPending}
+            className="rounded-lg bg-accent hover:bg-accent-dark text-ink px-5 py-2.5 font-semibold disabled:opacity-50"
           >
-            Post my job
+            {isPending ? "Posting..." : "Post my job"}
           </button>
         )}
       </div>
+
+      {state.error && (
+        <p className="rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700">
+          {state.error}
+        </p>
+      )}
     </form>
   );
 }

@@ -50,7 +50,7 @@ const tiers = [
 export default function PricingPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-14">
-      <h1 className="text-3xl md:text-4xl font-bold text-center">
+      <h1 className="shout text-3xl md:text-4xl text-center">
         Plans for tradespeople
       </h1>
       <p className="mt-3 text-center text-ink/70 max-w-xl mx-auto">

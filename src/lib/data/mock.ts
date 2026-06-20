@@ -268,6 +268,29 @@ export const mockStore: DataStore = {
     return db.jobs.find((j) => j.manageToken === token) ?? null;
   },
 
+  async cancelJobByToken(token: string) {
+    const job = db.jobs.find((j) => j.manageToken === token);
+    if (job && job.status !== "completed") job.status = "removed";
+  },
+
+  async completeJobByToken(token: string) {
+    const job = db.jobs.find((j) => j.manageToken === token);
+    if (job && (job.status === "live" || job.status === "fully_claimed"))
+      job.status = "completed";
+  },
+
+  async getJobClaimants(jobId: string) {
+    return db.unlocks
+      .filter((u) => u.jobId === jobId)
+      .map((u) => db.trades.find((t) => t.id === u.tradeId))
+      .filter((t): t is TradesPerson => Boolean(t))
+      .map((t) => ({
+        businessName: t.businessName,
+        tier: t.tier,
+        verified: t.verifiedAt !== null,
+      }));
+  },
+
   async getTrade(id: string) {
     return db.trades.find((t) => t.id === id) ?? null;
   },
@@ -366,6 +389,21 @@ export const mockStore: DataStore = {
 
   async getTrades() {
     return [...db.trades];
+  },
+
+  async setTradeStatus(tradeId: string, status: TradesPerson["status"]) {
+    const trade = db.trades.find((t) => t.id === tradeId);
+    if (trade) trade.status = status;
+  },
+
+  async setTradeTier(tradeId: string, tier: TradesPerson["tier"]) {
+    const trade = db.trades.find((t) => t.id === tradeId);
+    if (trade) trade.tier = tier;
+  },
+
+  async setTradeVerified(tradeId: string, verified: boolean) {
+    const trade = db.trades.find((t) => t.id === tradeId);
+    if (trade) trade.verifiedAt = verified ? new Date().toISOString() : null;
   },
 
   async getReviews() {
