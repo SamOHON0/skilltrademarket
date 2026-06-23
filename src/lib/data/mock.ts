@@ -295,6 +295,11 @@ export const mockStore: DataStore = {
     return db.trades.find((t) => t.id === id) ?? null;
   },
 
+  // Mock has no auth layer; sign-in is a Supabase-only path.
+  async getTradeByAuthUserId(_authUserId: string) {
+    return null;
+  },
+
   async getFeed(tradeId: string) {
     const trade = db.trades.find((t) => t.id === tradeId);
     if (!trade) return [];

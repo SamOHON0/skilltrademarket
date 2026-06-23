@@ -37,8 +37,8 @@ export default function RootLayout({
               <Link href="/trade/feed" className="hover:text-accent">
                 Job feed
               </Link>
-              <Link href="/admin" className="hover:text-accent">
-                Admin
+              <Link href="/login" className="hover:text-accent">
+                Trade log in
               </Link>
               <Link
                 href="/post-job"

@@ -31,6 +31,7 @@ export interface DataStore {
 
   // Trade side
   getTrade(id: string): Promise<TradesPerson | null>;
+  getTradeByAuthUserId(authUserId: string): Promise<TradesPerson | null>;
   getFeed(tradeId: string): Promise<FeedJob[]>;
   unlockJob(jobId: string, tradeId: string): Promise<UnlockResult>;
   getUnlocks(tradeId: string): Promise<(Unlock & { job: Job })[]>;

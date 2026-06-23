@@ -1,7 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentUser, isAdminEmail } from "@/lib/auth";
+import { signOut } from "@/app/auth-actions";
 
-// AUTH PLACEHOLDER: when Supabase Auth is wired, gate /admin/* in middleware
-// on an admin role claim (see src/lib/data/supabase.ts notes).
+// Admin is gated when Supabase is configured: must be signed in and on the
+// ADMIN_EMAILS allowlist. In mock mode it stays open for local development.
+// Middleware enforces this too; this is defence in depth.
 
 const nav = [
   ["/admin", "Dashboard"],
@@ -10,11 +14,17 @@ const nav = [
   ["/admin/reviews", "Reviews"],
 ];
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  if (process.env.DATA_SOURCE === "supabase") {
+    const user = await getCurrentUser();
+    if (!user) redirect("/login?next=/admin");
+    if (!isAdminEmail(user.email)) redirect("/login?error=not-admin");
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 md:flex md:gap-8">
       <aside className="md:w-48 shrink-0 mb-6 md:mb-0">
@@ -32,6 +42,11 @@ export default function AdminLayout({
             </Link>
           ))}
         </nav>
+        <form action={signOut} className="mt-4 hidden md:block">
+          <button className="text-xs underline text-ink/50 hover:text-ink px-3">
+            Log out
+          </button>
+        </form>
       </aside>
       <div className="flex-1 min-w-0">{children}</div>
     </div>

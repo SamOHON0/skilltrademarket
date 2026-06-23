@@ -1,27 +1,19 @@
 import Link from "next/link";
 import { getDataStore } from "@/lib/data";
+import { getCurrentTrade } from "@/lib/auth";
+import { signOut } from "@/app/auth-actions";
 import { TIER_LABELS, UNLOCK_ALLOWANCES_MONTHLY, URGENCY_LABELS } from "@/lib/constants";
 import UnlockButton from "./UnlockButton";
 
 export const metadata = { title: "Job feed | Skill Trade" };
 
-// DEMO MODE: until Supabase Auth is wired, pick a trade with ?as=<id>.
-// Elite plumber (Dublin/Meath), Pro electrician (Dublin/Kildare),
-// Basic painter (Kildare/Dublin/Wicklow). Tier release windows apply for real.
-// IDs differ by data source: mock uses trade-1/2/3, the live DB uses the UUIDs
-// from supabase/seed_dev.sql.
-const DEMO_TRADES =
-  process.env.DATA_SOURCE === "supabase"
-    ? [
-        { id: "11111111-1111-1111-1111-111111111111", label: "Plumber" },
-        { id: "22222222-2222-2222-2222-222222222222", label: "Electrician" },
-        { id: "33333333-3333-3333-3333-333333333333", label: "Painter" },
-      ]
-    : [
-        { id: "trade-1", label: "trade-1" },
-        { id: "trade-2", label: "trade-2" },
-        { id: "trade-3", label: "trade-3" },
-      ];
+// In mock mode (no auth) the feed is browsable as a demo trade via ?as=<id>.
+// In Supabase mode the signed-in trade is used and this switcher is hidden.
+const DEMO_TRADES = [
+  { id: "trade-1", label: "trade-1" },
+  { id: "trade-2", label: "trade-2" },
+  { id: "trade-3", label: "trade-3" },
+];
 
 export default async function FeedPage({
   searchParams,
@@ -29,18 +21,55 @@ export default async function FeedPage({
   searchParams: Promise<{ as?: string }>;
 }) {
   const { as } = await searchParams;
-  const tradeId = as ?? DEMO_TRADES[0].id;
   const store = getDataStore();
-  const trade = await store.getTrade(tradeId);
+  const supabaseMode = process.env.DATA_SOURCE === "supabase";
+
+  const current = await getCurrentTrade();
+  let trade = current;
+  let tradeId = current?.id ?? "";
+  let isDemo = false;
+
+  if (!current && !supabaseMode) {
+    isDemo = true;
+    tradeId = as ?? DEMO_TRADES[0].id;
+    trade = await store.getTrade(tradeId);
+  }
+
+  // Logged in (Supabase) but this account has no trade profile, e.g. an admin.
+  if (!trade && supabaseMode) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16">
+        <h1 className="shout text-3xl">No trade profile</h1>
+        <p className="mt-3 text-ink/70">
+          This account is signed in but has no tradesperson profile attached.
+        </p>
+        <div className="mt-6 flex gap-3">
+          <Link
+            href="/trade/signup"
+            className="rounded-lg bg-accent hover:bg-accent-dark text-ink px-4 py-2.5 font-semibold"
+          >
+            Create a trade profile
+          </Link>
+          <form action={signOut}>
+            <button className="rounded-lg border border-ink/20 px-4 py-2.5 font-medium hover:bg-white">
+              Log out
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   const feed = trade ? await store.getFeed(tradeId) : [];
   const unlocks = trade ? await store.getUnlocks(tradeId) : [];
   const allowance = trade ? UNLOCK_ALLOWANCES_MONTHLY[trade.tier] : null;
+  const pending = trade ? trade.status !== "active" || !trade.subscriptionActive : false;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Job feed</h1>
+          <h1 className="shout text-3xl">Job feed</h1>
           {trade && (
             <p className="mt-1 text-ink/70">
               {trade.businessName} &middot;{" "}
@@ -54,21 +83,37 @@ export default async function FeedPage({
             </p>
           )}
         </div>
-        <div className="text-xs text-ink/50">
-          Demo as:{" "}
-          {DEMO_TRADES.map((t) => (
-            <Link
-              key={t.id}
-              href={`/trade/feed?as=${t.id}`}
-              className={`ml-1 underline ${t.id === tradeId ? "font-bold text-ink" : ""}`}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </div>
+        {current ? (
+          <form action={signOut}>
+            <button className="text-sm underline text-ink/60 hover:text-ink">
+              Log out
+            </button>
+          </form>
+        ) : isDemo ? (
+          <div className="text-xs text-ink/50">
+            Demo as:{" "}
+            {DEMO_TRADES.map((t) => (
+              <Link
+                key={t.id}
+                href={`/trade/feed?as=${t.id}`}
+                className={`ml-1 underline ${t.id === tradeId ? "font-bold text-ink" : ""}`}
+              >
+                {t.label}
+              </Link>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {!trade && <p className="mt-8">Trade not found.</p>}
+
+      {pending && (
+        <p className="mt-6 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900">
+          Your account is being set up. You can browse matched jobs now;
+          unlocking opens once your account is approved and your subscription is
+          active (Phase 3).
+        </p>
+      )}
 
       <div className="mt-8 space-y-4">
         {feed.map((job) => {

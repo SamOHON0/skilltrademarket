@@ -239,6 +239,17 @@ export const supabaseStore: DataStore = {
     return data ? toTrade(data) : null;
   },
 
+  async getTradeByAuthUserId(authUserId: string) {
+    const db = createServiceClient();
+    const { data, error } = await db
+      .from("trades_people")
+      .select("*")
+      .eq("auth_user_id", authUserId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? toTrade(data) : null;
+  },
+
   async getFeed(tradeId: string) {
     const db = createServiceClient();
 
