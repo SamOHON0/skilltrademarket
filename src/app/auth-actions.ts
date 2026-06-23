@@ -62,7 +62,7 @@ export async function signUpTrade(
     return { error: insErr.message };
   }
 
-  if (data.session) redirect("/trade/feed");
+  if (data.session) redirect("/trade/dashboard");
   redirect("/login?notice=check-email");
 }
 
@@ -72,14 +72,14 @@ export async function signInUser(
 ): Promise<AuthState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = String(formData.get("next") ?? "/trade/feed") || "/trade/feed";
+  const next = String(formData.get("next") ?? "/trade/dashboard") || "/trade/dashboard";
 
   const supabase = await createServerSupabase();
   if (!supabase) return NO_SUPABASE;
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "Wrong email or password." };
-  redirect(next.startsWith("/") ? next : "/trade/feed");
+  redirect(next.startsWith("/") ? next : "/trade/dashboard");
 }
 
 export async function signOut() {
@@ -121,5 +121,5 @@ export async function updatePassword(
 
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: error.message };
-  redirect("/trade/feed");
+  redirect("/trade/dashboard");
 }

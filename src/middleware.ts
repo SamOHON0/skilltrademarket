@@ -3,9 +3,9 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
-// Protects authenticated areas and keeps the session cookie fresh.
-// Only active when Supabase is configured (DATA_SOURCE=supabase); in mock mode
-// the demo feed stays open.
+// Refreshes the Supabase session on every navigation (so users stay logged in)
+// and protects the trade + admin areas. Only active when Supabase is configured
+// (DATA_SOURCE=supabase); in mock mode the demo feed stays open.
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -27,15 +27,17 @@ export async function middleware(request: NextRequest) {
     },
   });
 
+  // Touch the session so the access token is refreshed and re-stored as needed.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
   const isAdmin = path === "/admin" || path.startsWith("/admin/");
-  const isTradeFeed = path.startsWith("/trade/feed");
+  const isTradeArea =
+    path.startsWith("/trade/feed") || path.startsWith("/trade/dashboard");
 
-  if ((isAdmin || isTradeFeed) && !user) {
+  if ((isAdmin || isTradeArea) && !user) {
     const to = new URL("/login", request.url);
     to.searchParams.set("next", path);
     return NextResponse.redirect(to);
@@ -55,5 +57,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/trade/feed/:path*"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 };

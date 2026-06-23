@@ -23,7 +23,7 @@ export default function LoginForm({
 
   return (
     <form action={action} className="space-y-4">
-      <input type="hidden" name="next" value={next ?? "/trade/feed"} />
+      <input type="hidden" name="next" value={next ?? "/trade/dashboard"} />
       <div>
         <label className={labelCls} htmlFor="email">
           Email

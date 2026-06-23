@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Archivo, Inter } from "next/font/google";
 import "./globals.css";
+import { getCurrentUser } from "@/lib/auth";
+import { signOut } from "@/app/auth-actions";
 
 const archivo = Archivo({
   subsets: ["latin"],
@@ -16,9 +18,11 @@ export const metadata: Metadata = {
     "Skill Trade connects you with up to five local tradespeople across Ireland. No hidden fees, no dead leads.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const user = await getCurrentUser();
+
   return (
     <html lang="en" className={`${archivo.variable} ${inter.variable}`}>
       <body className="min-h-screen flex flex-col antialiased">
@@ -34,12 +38,23 @@ export default function RootLayout({
               <Link href="/pricing" className="hover:text-accent">
                 For trades
               </Link>
-              <Link href="/trade/feed" className="hover:text-accent">
-                Job feed
-              </Link>
-              <Link href="/login" className="hover:text-accent">
-                Trade log in
-              </Link>
+              {user ? (
+                <>
+                  <Link href="/trade/dashboard" className="hover:text-accent">
+                    Dashboard
+                  </Link>
+                  <Link href="/trade/feed" className="hover:text-accent">
+                    Job feed
+                  </Link>
+                  <form action={signOut}>
+                    <button className="hover:text-accent">Log out</button>
+                  </form>
+                </>
+              ) : (
+                <Link href="/login" className="hover:text-accent">
+                  Trade log in
+                </Link>
+              )}
               <Link
                 href="/post-job"
                 className="bg-accent hover:bg-accent-dark text-ink font-semibold rounded-lg px-4 py-2"
