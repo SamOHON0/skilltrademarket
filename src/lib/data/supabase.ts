@@ -27,7 +27,13 @@ import type {
   UnlockOutcome,
   UnlockResult,
 } from "../types";
-import { JOB_EXPIRY_DAYS, TIER_RELEASE_OFFSETS_MINUTES } from "../constants";
+import {
+  JOB_EXPIRY_DAYS,
+  MATCH_RADIUS_KM,
+  TIER_RELEASE_OFFSETS_MINUTES,
+} from "../constants";
+import { matchesLocation } from "../geo";
+import { geocode } from "../geocode";
 import { createServiceClient } from "../supabase/server";
 
 // ---------- row mappers (snake_case DB -> camelCase domain) ----------
@@ -59,6 +65,10 @@ function toTrade(r: Row): TradesPerson {
     subscriptionActive: r.subscription_active as boolean,
     verifiedAt: (r.verified_at as string | null) ?? null,
     status: r.status as TradesPerson["status"],
+    lat: (r.lat as number | null) ?? null,
+    lng: (r.lng as number | null) ?? null,
+    baseEircode: (r.base_eircode as string | null) ?? null,
+    baseTown: (r.base_town as string | null) ?? null,
     createdAt: r.created_at as string,
   };
 }
@@ -87,6 +97,8 @@ function toJob(r: Row): Job {
     unlockCount: r.unlock_count as number,
     releasedAt: (r.released_at as string | null) ?? null,
     expiresAt: (r.expires_at as string | null) ?? null,
+    lat: (r.lat as number | null) ?? null,
+    lng: (r.lng as number | null) ?? null,
     createdAt: r.created_at as string,
   };
 }
@@ -151,6 +163,7 @@ export const supabaseStore: DataStore = {
 
   async createJob(input: NewJobInput) {
     const db = createServiceClient();
+    const coords = await geocode([input.eircode, input.town, input.county]);
     const { data, error } = await db
       .from("jobs")
       .insert({
@@ -169,6 +182,8 @@ export const supabaseStore: DataStore = {
         preferred_contact: input.preferredContact,
         consent_share_contact: input.consentShareContact,
         consent_review_contact: input.consentReviewContact,
+        lat: coords?.lat ?? null,
+        lng: coords?.lng ?? null,
         status: "pending_review", // admin approval queue (PRD decision 2)
       })
       .select("*")
@@ -266,8 +281,7 @@ export const supabaseStore: DataStore = {
       .from("jobs")
       .select("*")
       .in("status", ["live", "fully_claimed"])
-      .in("category", trade.tradeCategories)
-      .in("county", trade.counties);
+      .in("category", trade.tradeCategories);
     if (error) throw error;
 
     const { data: unlockRows, error: uErr } = await db
@@ -280,7 +294,12 @@ export const supabaseStore: DataStore = {
     const now = Date.now();
     return (jobRows ?? [])
       .map(toJob)
-      .filter((j) => now >= visibleAtMs(j, trade.tier))
+      .filter(
+        (j) =>
+          matchesLocation(j, trade, MATCH_RADIUS_KM) &&
+          now >= visibleAtMs(j, trade.tier) &&
+          (!j.expiresAt || new Date(j.expiresAt).getTime() > now)
+      )
       .sort((a, b) => visibleAtMs(b, trade.tier) - visibleAtMs(a, trade.tier))
       .map((j) => toFeedJob(j, unlockedJobIds.has(j.id)));
   },

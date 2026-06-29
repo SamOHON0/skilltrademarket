@@ -4,6 +4,10 @@ import { getCurrentTrade } from "@/lib/auth";
 import { getDataStore } from "@/lib/data";
 import { signOut } from "@/app/auth-actions";
 import { setOutcomeAction } from "@/app/actions";
+import ContactButtons from "@/components/ContactButtons";
+import UrgencyBadge from "@/components/UrgencyBadge";
+import JobMap from "@/components/JobMap";
+import { jobDistanceKm } from "@/lib/geo";
 import {
   TIER_LABELS,
   UNLOCK_ALLOWANCES_MONTHLY,
@@ -13,6 +17,10 @@ import {
 export const metadata = { title: "Dashboard | Skill Trade" };
 
 const OUTCOMES = ["won", "lost", "completed"] as const;
+
+function kmLabel(km: number): string {
+  return km < 10 ? `${km.toFixed(1)} km away` : `${Math.round(km)} km away`;
+}
 
 export default async function DashboardPage() {
   const supabaseMode = process.env.DATA_SOURCE === "supabase";
@@ -67,7 +75,7 @@ export default async function DashboardPage() {
           ? `${usedThisMonth} / unlimited`
           : `${usedThisMonth} / ${allowance}`,
     },
-    { label: "Jobs in your feed", value: String(feed.length) },
+    { label: "Jobs near you", value: String(feed.length) },
     { label: "Jobs unlocked", value: String(unlocks.length) },
   ];
 
@@ -105,6 +113,28 @@ export default async function DashboardPage() {
         </p>
       )}
 
+      {/* Quick actions */}
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Link
+          href="/trade/feed"
+          className="rounded-lg bg-accent hover:bg-accent-dark text-ink px-5 py-2.5 font-semibold"
+        >
+          Browse {feed.length} job{feed.length === 1 ? "" : "s"} near you
+        </Link>
+        <Link
+          href="/trade/profile"
+          className="rounded-lg border border-ink/20 px-5 py-2.5 font-medium hover:bg-white"
+        >
+          Edit profile
+        </Link>
+        <Link
+          href="/post-job"
+          className="rounded-lg border border-ink/20 px-5 py-2.5 font-medium hover:bg-white"
+        >
+          Need a job done? Post one
+        </Link>
+      </div>
+
       <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => (
           <div key={s.label} className="rounded-xl bg-white p-5 shadow-sm">
@@ -131,48 +161,69 @@ export default async function DashboardPage() {
               local work.
             </p>
           ) : (
-            <ul className="mt-4 space-y-4">
-              {unlocks.map((u) => (
-                <li
-                  key={u.id}
-                  className="border-t border-ink/10 pt-4 first:border-0 first:pt-0"
-                >
-                  <h3 className="font-semibold">{u.job.title}</h3>
-                  <p className="mt-0.5 text-sm text-ink/70">
-                    {[u.job.town, u.job.county].filter(Boolean).join(", ")}{" "}
-                    &middot; {URGENCY_LABELS[u.job.urgency]}
-                  </p>
-                  <p className="mt-1 text-sm">
-                    {u.job.customerName} &middot; {u.job.customerPhone} &middot;{" "}
-                    {u.job.customerEmail}{" "}
-                    <span className="text-ink/50">
-                      (prefers {u.job.preferredContact})
-                    </span>
-                  </p>
-                  <form
-                    action={setOutcomeAction}
-                    className="mt-2 flex items-center gap-2"
+            <ul className="mt-4 space-y-5">
+              {unlocks.map((u) => {
+                const dist = jobDistanceKm(u.job, trade);
+                return (
+                  <li
+                    key={u.id}
+                    className="border-t border-ink/10 pt-5 first:border-0 first:pt-0"
                   >
-                    <input type="hidden" name="unlockId" value={u.id} />
-                    <span className="text-xs text-ink/50">Outcome:</span>
-                    <select
-                      name="outcome"
-                      defaultValue={u.outcome}
-                      className="rounded-lg border border-ink/20 bg-white px-2 py-1 text-sm"
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{u.job.title}</h3>
+                      <UrgencyBadge urgency={u.job.urgency} />
+                    </div>
+                    <p className="mt-0.5 text-sm text-ink/70">
+                      {[u.job.town, u.job.county].filter(Boolean).join(", ")}
+                      {dist != null ? ` · ${kmLabel(dist)}` : ""} &middot;{" "}
+                      {URGENCY_LABELS[u.job.urgency]}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {u.job.customerName}
+                    </p>
+                    <div className="mt-2">
+                      <ContactButtons
+                        phone={u.job.customerPhone}
+                        email={u.job.customerEmail}
+                        preferred={u.job.preferredContact}
+                      />
+                    </div>
+                    {u.job.lat != null && u.job.lng != null && (
+                      <div className="mt-3">
+                        <JobMap
+                          lat={u.job.lat}
+                          lng={u.job.lng}
+                          marker
+                          className="h-40"
+                          label={`${u.job.title} location`}
+                        />
+                      </div>
+                    )}
+                    <form
+                      action={setOutcomeAction}
+                      className="mt-3 flex items-center gap-2"
                     >
-                      <option value="none">Not set</option>
-                      {OUTCOMES.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                    </select>
-                    <button className="rounded-lg border border-ink/20 px-3 py-1 text-sm font-medium hover:bg-paper">
-                      Save
-                    </button>
-                  </form>
-                </li>
-              ))}
+                      <input type="hidden" name="unlockId" value={u.id} />
+                      <span className="text-xs text-ink/50">Outcome:</span>
+                      <select
+                        name="outcome"
+                        defaultValue={u.outcome}
+                        className="rounded-lg border border-ink/20 bg-white px-2 py-1 text-sm"
+                      >
+                        <option value="none">Not set</option>
+                        {OUTCOMES.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                      </select>
+                      <button className="rounded-lg border border-ink/20 px-3 py-1 text-sm font-medium hover:bg-paper">
+                        Save
+                      </button>
+                    </form>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -187,6 +238,13 @@ export default async function DashboardPage() {
               </dd>
             </div>
             <div>
+              <dt className="text-ink/50">Base</dt>
+              <dd className="font-medium">
+                {trade.baseTown || trade.baseEircode || "Not set"}
+                {trade.lat != null ? "" : " (county matching)"}
+              </dd>
+            </div>
+            <div>
               <dt className="text-ink/50">Counties</dt>
               <dd className="font-medium">
                 {trade.counties.join(", ") || "None set"}
@@ -197,14 +255,6 @@ export default async function DashboardPage() {
               <dd className="font-medium capitalize">
                 {trade.status}
                 {trade.subscriptionActive ? ", subscribed" : ""}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-ink/50">Contact</dt>
-              <dd className="font-medium">
-                {trade.email}
-                <br />
-                {trade.phone}
               </dd>
             </div>
           </dl>

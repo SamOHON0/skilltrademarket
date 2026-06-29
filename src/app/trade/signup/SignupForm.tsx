@@ -62,6 +62,25 @@ export default function SignupForm({
         <p className="mt-1 text-xs text-ink/50">At least 8 characters.</p>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className={labelCls} htmlFor="baseTown">
+            Base town or area
+          </label>
+          <input id="baseTown" name="baseTown" className={inputCls} placeholder="e.g. Drumcondra" />
+        </div>
+        <div>
+          <label className={labelCls} htmlFor="baseEircode">
+            Base eircode (optional)
+          </label>
+          <input id="baseEircode" name="baseEircode" className={inputCls} placeholder="D09 X1Y2" />
+        </div>
+      </div>
+      <p className="-mt-3 text-xs text-ink/50">
+        We use this to show you jobs within 12 km. Leave blank and we match you
+        by county instead.
+      </p>
+
       <fieldset>
         <legend className="text-sm font-medium mb-2">
           Trades you cover

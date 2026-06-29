@@ -2,18 +2,29 @@ import Link from "next/link";
 import { getDataStore } from "@/lib/data";
 import { getCurrentTrade } from "@/lib/auth";
 import { signOut } from "@/app/auth-actions";
-import { TIER_LABELS, UNLOCK_ALLOWANCES_MONTHLY, URGENCY_LABELS } from "@/lib/constants";
+import {
+  TIER_LABELS,
+  UNLOCK_ALLOWANCES_MONTHLY,
+  URGENCY_LABELS,
+  MATCH_RADIUS_KM,
+} from "@/lib/constants";
+import { jobDistanceKm } from "@/lib/geo";
 import UnlockButton from "./UnlockButton";
+import ContactButtons from "@/components/ContactButtons";
+import UrgencyBadge from "@/components/UrgencyBadge";
+import JobMap from "@/components/JobMap";
 
 export const metadata = { title: "Job feed | Skill Trade" };
 
-// In mock mode (no auth) the feed is browsable as a demo trade via ?as=<id>.
-// In Supabase mode the signed-in trade is used and this switcher is hidden.
 const DEMO_TRADES = [
   { id: "trade-1", label: "trade-1" },
   { id: "trade-2", label: "trade-2" },
   { id: "trade-3", label: "trade-3" },
 ];
+
+function kmLabel(km: number): string {
+  return km < 10 ? `${km.toFixed(1)} km away` : `${Math.round(km)} km away`;
+}
 
 export default async function FeedPage({
   searchParams,
@@ -35,7 +46,6 @@ export default async function FeedPage({
     trade = await store.getTrade(tradeId);
   }
 
-  // Logged in (Supabase) but this account has no trade profile, e.g. an admin.
   if (!trade && supabaseMode) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16">
@@ -63,7 +73,9 @@ export default async function FeedPage({
   const feed = trade ? await store.getFeed(tradeId) : [];
   const unlocks = trade ? await store.getUnlocks(tradeId) : [];
   const allowance = trade ? UNLOCK_ALLOWANCES_MONTHLY[trade.tier] : null;
-  const pending = trade ? trade.status !== "active" || !trade.subscriptionActive : false;
+  const pending = trade
+    ? trade.status !== "active" || !trade.subscriptionActive
+    : false;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -115,17 +127,29 @@ export default async function FeedPage({
         </p>
       )}
 
-      <div className="mt-8 space-y-4">
+      {trade && (
+        <p className="mt-4 text-xs text-ink/50">
+          Showing jobs within {MATCH_RADIUS_KM} km of your base (or in your
+          counties where we don&apos;t have an exact location).
+        </p>
+      )}
+
+      <div className="mt-4 space-y-4">
         {feed.map((job) => {
           const slotsLeft = 5 - job.unlockCount;
           const myUnlock = unlocks.find((u) => u.jobId === job.id);
+          const dist = trade ? jobDistanceKm(job, trade) : null;
           return (
             <div key={job.id} className="rounded-xl bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="font-semibold text-lg">{job.title}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-semibold text-lg">{job.title}</h2>
+                    <UrgencyBadge urgency={job.urgency} />
+                  </div>
                   <p className="mt-1 text-sm text-ink/70">
-                    {[job.town, job.county].filter(Boolean).join(", ")} &middot;{" "}
+                    {[job.town, job.county].filter(Boolean).join(", ")}
+                    {dist != null ? ` · ${kmLabel(dist)}` : ""} &middot;{" "}
                     {URGENCY_LABELS[job.urgency]}
                     {job.budgetBand ? <> &middot; {job.budgetBand}</> : null}
                   </p>
@@ -140,18 +164,37 @@ export default async function FeedPage({
                       : "bg-ink/10 text-ink/60"
                   }`}
                 >
-                  {slotsLeft > 0 ? `${slotsLeft} of 5 slots left` : "Fully claimed"}
+                  {slotsLeft > 0
+                    ? `${job.unlockCount} of 5 unlocked`
+                    : "Fully claimed"}
                 </span>
               </div>
+
+              {job.lat != null && job.lng != null && (
+                <div className="mt-3">
+                  <JobMap
+                    lat={job.lat}
+                    lng={job.lng}
+                    marker={!!myUnlock}
+                    className="h-40"
+                    label={`${job.town ?? job.county} area`}
+                  />
+                </div>
+              )}
 
               <div className="mt-4 border-t border-ink/10 pt-4">
                 {myUnlock ? (
                   <div className="text-sm">
                     <p className="font-semibold text-green-700">
-                      Unlocked. Customer: {myUnlock.job.customerName},{" "}
-                      {myUnlock.job.customerPhone}, {myUnlock.job.customerEmail}{" "}
-                      (prefers {myUnlock.job.preferredContact})
+                      Unlocked. Customer: {myUnlock.job.customerName}
                     </p>
+                    <div className="mt-2">
+                      <ContactButtons
+                        phone={myUnlock.job.customerPhone}
+                        email={myUnlock.job.customerEmail}
+                        preferred={myUnlock.job.preferredContact}
+                      />
+                    </div>
                   </div>
                 ) : (
                   <UnlockButton
@@ -166,8 +209,8 @@ export default async function FeedPage({
         })}
         {trade && feed.length === 0 && (
           <p className="text-ink/60">
-            No jobs match your trade and counties right now. Higher tiers see
-            new jobs sooner.
+            No jobs match your trade within {MATCH_RADIUS_KM} km right now. Higher
+            tiers see new jobs sooner.
           </p>
         )}
       </div>

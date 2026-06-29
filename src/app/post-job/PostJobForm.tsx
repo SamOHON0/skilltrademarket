@@ -182,22 +182,38 @@ export default function PostJobForm({
           </div>
         </div>
         <div>
-          <label className={labelCls} htmlFor="preferredContact">How should trades contact you?</label>
-          <select id="preferredContact" name="preferredContact" className={inputCls}>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="call">Phone call</option>
-            <option value="email">Email</option>
-          </select>
+          <span className={labelCls}>How should trades contact you?</span>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              ["whatsapp", "WhatsApp"],
+              ["call", "Phone call"],
+              ["email", "Email"],
+            ].map(([value, label], i) => (
+              <label
+                key={value}
+                className="cursor-pointer rounded-lg border border-ink/15 bg-white px-3 py-2.5 text-sm font-medium text-center has-checked:border-accent has-checked:bg-accent/10"
+              >
+                <input
+                  type="radio"
+                  name="preferredContact"
+                  value={value}
+                  defaultChecked={i === 0}
+                  className="sr-only"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
         </div>
         <label className="flex items-start gap-2.5 text-sm">
-          <input type="checkbox" name="consentShareContact" className="mt-0.5 accent-[#f59e0b]" />
+          <input type="checkbox" name="consentShareContact" className="mt-0.5 accent-[#f2a20c]" />
           <span>
-            I agree to my contact details being shared with up to five
-            tradespeople matched to this job. Required.
+            I&apos;m happy to be contacted by up to five matched tradespeople
+            about this job, by my chosen method above. Required.
           </span>
         </label>
         <label className="flex items-start gap-2.5 text-sm">
-          <input type="checkbox" name="consentReviewContact" className="mt-0.5 accent-[#f59e0b]" />
+          <input type="checkbox" name="consentReviewContact" className="mt-0.5 accent-[#f2a20c]" />
           <span>
             Contact me after the job is done so I can leave a review. Optional.
           </span>

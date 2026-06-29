@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createServerSupabase, createServiceClient } from "@/lib/supabase/server";
+import { geocode } from "@/lib/geocode";
 
 export type AuthState = { error?: string; notice?: string };
 
@@ -21,6 +22,8 @@ export async function signUpTrade(
   const phone = String(formData.get("phone") ?? "").trim();
   const tradeCategories = formData.getAll("tradeCategories").map(String);
   const counties = formData.getAll("counties").map(String);
+  const baseEircode = String(formData.get("baseEircode") ?? "").trim();
+  const baseTown = String(formData.get("baseTown") ?? "").trim();
 
   if (!email || !email.includes("@")) return { error: "Enter a valid email." };
   if (password.length < 8)
@@ -40,6 +43,9 @@ export async function signUpTrade(
   const userId = data.user?.id;
   if (!userId) return { error: "Could not create the account. Try again." };
 
+  // Geocode the trade's base location for distance matching (county fallback if it fails).
+  const coords = await geocode([baseEircode, baseTown, counties[0]]);
+
   // Create the linked trade profile with the service role (bypasses RLS).
   const admin = createServiceClient();
   const { error: insErr } = await admin.from("trades_people").insert({
@@ -50,6 +56,10 @@ export async function signUpTrade(
     phone,
     trade_categories: tradeCategories,
     counties,
+    base_eircode: baseEircode || null,
+    base_town: baseTown || null,
+    lat: coords?.lat ?? null,
+    lng: coords?.lng ?? null,
     tier: "basic",
     subscription_active: false,
     status: "pending",

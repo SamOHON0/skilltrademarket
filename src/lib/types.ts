@@ -43,6 +43,10 @@ export interface TradesPerson {
   subscriptionActive: boolean;
   verifiedAt: string | null;
   status: TradeStatus;
+  lat: number | null;
+  lng: number | null;
+  baseEircode: string | null;
+  baseTown: string | null;
   createdAt: string;
 }
 
@@ -69,6 +73,8 @@ export interface Job {
   unlockCount: number;
   releasedAt: string | null;
   expiresAt: string | null;
+  lat: number | null;
+  lng: number | null;
   createdAt: string;
 }
 

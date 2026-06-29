@@ -7,11 +7,14 @@ import { signOut } from "@/app/auth-actions";
 // ADMIN_EMAILS allowlist. In mock mode it stays open for local development.
 // Middleware enforces this too; this is defence in depth.
 
-const nav = [
+const nav: [string, string][] = [
   ["/admin", "Dashboard"],
   ["/admin/jobs", "Job queue"],
   ["/admin/trades", "Trades"],
+  ["/admin/verification", "Verification"],
   ["/admin/reviews", "Reviews"],
+  ["/admin/leaderboard", "Leaderboard"],
+  ["/admin/settings", "Settings"],
 ];
 
 export default async function AdminLayout({

@@ -18,6 +18,15 @@ export const metadata: Metadata = {
     "Skill Trade connects you with up to five local tradespeople across Ireland. No hidden fees, no dead leads.",
 };
 
+const footerLinks: [string, string][] = [
+  ["/how-it-works", "How it works"],
+  ["/pricing", "For trades"],
+  ["/leaderboard", "Leaderboard"],
+  ["/contact", "Contact"],
+  ["/terms", "Terms"],
+  ["/privacy", "Privacy"],
+];
+
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -66,9 +75,18 @@ export default async function RootLayout({
         </header>
         <main className="flex-1">{children}</main>
         <footer className="bg-ink text-white/60 text-sm">
-          <div className="mx-auto max-w-6xl px-4 py-8 flex flex-wrap items-center justify-between gap-4">
-            <p>Skill Trade. No hidden fees. No dead leads.</p>
-            <p>Built by SquareTwo</p>
+          <div className="mx-auto max-w-6xl px-4 py-8">
+            <nav className="flex flex-wrap gap-x-6 gap-y-2">
+              {footerLinks.map(([href, label]) => (
+                <Link key={href} href={href} className="hover:text-accent">
+                  {label}
+                </Link>
+              ))}
+            </nav>
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
+              <p>Skill Trade. No hidden fees. No dead leads.</p>
+              <p>Built by SquareTwo</p>
+            </div>
           </div>
         </footer>
       </body>

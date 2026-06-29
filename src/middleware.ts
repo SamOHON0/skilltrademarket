@@ -34,8 +34,14 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isAdmin = path === "/admin" || path.startsWith("/admin/");
+  const tradeAuthPages = [
+    "/trade/signup",
+    "/trade/forgot-password",
+    "/trade/reset-password",
+  ];
   const isTradeArea =
-    path.startsWith("/trade/feed") || path.startsWith("/trade/dashboard");
+    path.startsWith("/trade/") &&
+    !tradeAuthPages.some((p) => path === p || path.startsWith(p + "/"));
 
   if ((isAdmin || isTradeArea) && !user) {
     const to = new URL("/login", request.url);

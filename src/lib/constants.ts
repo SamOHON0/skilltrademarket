@@ -17,6 +17,7 @@ export const UNLOCK_ALLOWANCES_MONTHLY: Record<Tier, number | null> = {
 };
 
 export const JOB_UNLOCK_CAP = 5;
+export const MATCH_RADIUS_KM = 12; // distance matching radius, km
 export const JOB_EXPIRY_DAYS = 7;
 export const ADMIN_ESCALATION_HOURS = 48;
 

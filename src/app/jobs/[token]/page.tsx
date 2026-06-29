@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { getDataStore } from "@/lib/data";
 import { URGENCY_LABELS, TIER_LABELS } from "@/lib/constants";
 import { cancelJobAction, completeJobAction } from "@/app/actions";
+import UrgencyBadge from "@/components/UrgencyBadge";
+import JobMap from "@/components/JobMap";
 
 export const metadata = { title: "Your job | Skill Trade" };
 
@@ -28,11 +30,17 @@ export default async function ManageJobPage({
   if (!job) notFound();
 
   const claimants = await store.getJobClaimants(job.id);
+  const expired =
+    (job.status === "live" || job.status === "fully_claimed") &&
+    !!job.expiresAt &&
+    new Date(job.expiresAt).getTime() < Date.now();
+  const effectiveStatus = expired ? "expired" : job.status;
   const canCancel =
     job.status === "pending_review" ||
     job.status === "live" ||
     job.status === "fully_claimed";
-  const canComplete = job.status === "live" || job.status === "fully_claimed";
+  const canComplete =
+    !expired && (job.status === "live" || job.status === "fully_claimed");
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
@@ -42,20 +50,35 @@ export default async function ManageJobPage({
       <h1 className="mt-1 text-3xl font-bold">{job.title}</h1>
 
       <div className="mt-6 rounded-xl bg-white p-6 shadow-sm">
-        <p className="font-medium">{STATUS_COPY[job.status]}</p>
+        <p className="font-medium">{STATUS_COPY[effectiveStatus]}</p>
         <dl className="mt-4 grid grid-cols-2 gap-y-2 text-sm text-ink/70">
           <dt>Status</dt>
-          <dd className="font-medium text-ink">{job.status.replace("_", " ")}</dd>
+          <dd className="font-medium text-ink">{effectiveStatus.replace("_", " ")}</dd>
           <dt>Location</dt>
           <dd className="font-medium text-ink">
             {[job.town, job.county].filter(Boolean).join(", ")}
           </dd>
           <dt>Timing</dt>
-          <dd className="font-medium text-ink">{URGENCY_LABELS[job.urgency]}</dd>
+          <dd className="font-medium text-ink flex items-center gap-2">
+            <UrgencyBadge urgency={job.urgency} />
+            {URGENCY_LABELS[job.urgency]}
+          </dd>
           <dt>Trades claimed</dt>
           <dd className="font-medium text-ink">{job.unlockCount} of 5</dd>
         </dl>
       </div>
+
+      {job.lat != null && job.lng != null && (
+        <div className="mt-6">
+          <JobMap
+            lat={job.lat}
+            lng={job.lng}
+            marker
+            className="h-56"
+            label={`${job.title} location`}
+          />
+        </div>
+      )}
 
       {claimants.length > 0 && (
         <div className="mt-6 rounded-xl bg-white p-6 shadow-sm">

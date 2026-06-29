@@ -13,9 +13,11 @@ import type {
 import {
   JOB_EXPIRY_DAYS,
   JOB_UNLOCK_CAP,
+  MATCH_RADIUS_KM,
   TIER_RELEASE_OFFSETS_MINUTES,
   UNLOCK_ALLOWANCES_MONTHLY,
 } from "../constants";
+import { matchesLocation } from "../geo";
 
 // ---------- seed data ----------
 
@@ -68,6 +70,8 @@ function makeJob(partial: Partial<Job> & Pick<Job, "id" | "category" | "title" |
     unlockCount: 0,
     releasedAt: minsAgo(90),
     expiresAt: daysFromNow(JOB_EXPIRY_DAYS),
+    lat: null,
+    lng: null,
     createdAt: minsAgo(120),
     ...partial,
   };
@@ -90,6 +94,8 @@ function seed(): Db {
         description: "Radiator in the front room leaking at the valve. Wood floor, want it sorted quickly.",
         county: "Dublin",
         town: "Drumcondra",
+        lat: 53.37,
+        lng: -6.255,
         urgency: "asap",
         budgetBand: "Under EUR 250",
         answers: { job_type: "Repair" },
@@ -103,6 +109,8 @@ function seed(): Db {
         description: "Need a 7kW home charger installed, fuse board is 3 years old.",
         county: "Dublin",
         town: "Lucan",
+        lat: 53.356,
+        lng: -6.449,
         urgency: "this_month",
         budgetBand: "EUR 250 to 1,000",
         answers: { job_type: "New installation" },
@@ -114,6 +122,8 @@ function seed(): Db {
         title: "Repaint 3-bed interior before letting",
         county: "Kildare",
         town: "Naas",
+        lat: 53.219,
+        lng: -6.659,
         urgency: "this_week",
         budgetBand: "EUR 1,000 to 5,000",
         releasedAt: minsAgo(5), // Elite only right now
@@ -124,6 +134,8 @@ function seed(): Db {
         title: "Slipped slates after storm",
         county: "Dublin",
         town: "Clontarf",
+        lat: 53.366,
+        lng: -6.197,
         urgency: "asap",
         status: "pending_review", // sits in the admin queue
         releasedAt: null,
@@ -134,6 +146,8 @@ function seed(): Db {
         title: "Bathroom refit plumbing first fix",
         county: "Meath",
         town: "Ashbourne",
+        lat: 53.507,
+        lng: -6.399,
         urgency: "this_month",
         status: "fully_claimed",
         unlockCount: 5,
@@ -146,6 +160,10 @@ function seed(): Db {
         businessName: "Murphy Plumbing & Heating",
         ownerName: "Dec Murphy",
         email: "dec@murphyplumbing.ie",
+        lat: 53.39,
+        lng: -6.25,
+        baseEircode: null,
+        baseTown: "Drumcondra",
         phone: "0861111111",
         tradeCategories: ["plumbing"],
         counties: ["Dublin", "Meath"],
@@ -162,6 +180,10 @@ function seed(): Db {
         businessName: "Bright Spark Electrical",
         ownerName: "Aoife Byrne",
         email: "aoife@brightspark.ie",
+        lat: 53.34,
+        lng: -6.3,
+        baseEircode: null,
+        baseTown: "Dublin",
         phone: "0862222222",
         tradeCategories: ["electrical"],
         counties: ["Dublin", "Kildare"],
@@ -178,6 +200,10 @@ function seed(): Db {
         businessName: "O'Shea Painting",
         ownerName: "Tom O'Shea",
         email: "tom@osheapainting.ie",
+        lat: 53.219,
+        lng: -6.659,
+        baseEircode: null,
+        baseTown: "Naas",
         phone: "0863333333",
         tradeCategories: ["painting", "plastering"],
         counties: ["Kildare", "Dublin", "Wicklow"],
@@ -308,8 +334,9 @@ export const mockStore: DataStore = {
         (j) =>
           (j.status === "live" || j.status === "fully_claimed") &&
           trade.tradeCategories.includes(j.category) &&
-          trade.counties.includes(j.county) &&
-          Date.now() >= visibleAt(j, trade.tier)
+          matchesLocation(j, trade, MATCH_RADIUS_KM) &&
+          Date.now() >= visibleAt(j, trade.tier) &&
+          (!j.expiresAt || new Date(j.expiresAt).getTime() > Date.now())
       )
       .sort((a, b) => visibleAt(b, trade.tier) - visibleAt(a, trade.tier))
       .map((j) => toFeedJob(j, tradeId));
