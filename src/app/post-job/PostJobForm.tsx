@@ -1,15 +1,20 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { submitJob, type JobFormState } from "../actions";
 import { BUDGET_BANDS, COUNTIES, URGENCY_LABELS } from "@/lib/constants";
 import type { TradeCategory } from "@/lib/types";
 
-const STEPS = ["Trade", "Details", "Location", "Timing", "Contact"] as const;
+const STEPS = ["Trade", "Details", "Location", "Timing", "Contact", "Review"] as const;
 
 const inputCls =
   "w-full rounded-lg border border-ink/20 bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent";
 const labelCls = "block text-sm font-medium mb-1.5";
+const errCls = "mt-1 text-xs font-medium text-red-600";
+
+type Errors = Record<string, string>;
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export default function PostJobForm({
   categories,
@@ -18,30 +23,102 @@ export default function PostJobForm({
   categories: TradeCategory[];
   initialCategory?: string;
 }) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState(
     categories.some((c) => c.slug === initialCategory) ? initialCategory! : ""
   );
+  const [errors, setErrors] = useState<Errors>({});
+  const [values, setValues] = useState<Record<string, string>>({});
   const selected = categories.find((c) => c.slug === category);
+
   const [state, formAction, isPending] = useActionState<JobFormState, FormData>(
     submitJob,
     {}
   );
 
-  return (
-    <form action={formAction} className="space-y-6">
-      {/* Progress */}
-      <ol className="flex gap-1.5">
-        {STEPS.map((label, i) => (
-          <li
-            key={label}
-            className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-accent" : "bg-ink/10"}`}
-            aria-label={`${label}${i === step ? " (current step)" : ""}`}
-          />
-        ))}
-      </ol>
+  function validate(stepIdx: number, fd: FormData): Errors {
+    const e: Errors = {};
+    const get = (k: string) => String(fd.get(k) ?? "").trim();
+    if (stepIdx === 0 && !category) e.category = "Pick the trade you need.";
+    if (stepIdx === 1 && get("title").length < 4)
+      e.title = "Give the job a short, clear title.";
+    if (stepIdx === 2 && !get("county")) e.county = "Choose the county.";
+    if (stepIdx === 4) {
+      if (!get("customerName")) e.customerName = "Add your name.";
+      if (!get("customerPhone") && !get("customerEmail"))
+        e.customerContact = "Add a phone number or email so trades can reach you.";
+      const email = get("customerEmail");
+      if (email && !EMAIL_RE.test(email))
+        e.customerEmail = "That email address does not look right.";
+      if (fd.get("consentShareContact") !== "on")
+        e.consent = "Please confirm you are happy to be contacted.";
+    }
+    return e;
+  }
 
-      {/* Step 1: trade category */}
+  function capture(fd: FormData) {
+    const next: Record<string, string> = {};
+    for (const [k, v] of fd.entries()) {
+      if (typeof v === "string") next[k] = v;
+    }
+    setValues((prev) => ({ ...prev, ...next }));
+  }
+
+  function goNext() {
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    const e = validate(step, fd);
+    setErrors(e);
+    if (Object.keys(e).length > 0) return;
+    capture(fd);
+    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  }
+
+  function goBack() {
+    setErrors({});
+    setStep((s) => Math.max(0, s - 1));
+  }
+
+  const reviewRows: [string, string][] = [
+    ["Trade", selected?.name ?? "—"],
+    ["Title", values.title || "—"],
+    ["Location", [values.town, values.county].filter(Boolean).join(", ") || "—"],
+    ["Eircode", values.eircode || "—"],
+    ["Timing", URGENCY_LABELS[values.urgency ?? "flexible"] ?? "—"],
+    ["Budget", values.budgetBand || "Not specified"],
+    ["Name", values.customerName || "—"],
+    ["Phone", values.customerPhone || "—"],
+    ["Email", values.customerEmail || "—"],
+    [
+      "Preferred contact",
+      values.preferredContact === "whatsapp"
+        ? "WhatsApp"
+        : values.preferredContact === "email"
+          ? "Email"
+          : "Phone call",
+    ],
+  ];
+
+  return (
+    <form ref={formRef} action={formAction} className="space-y-6">
+      {/* Progress */}
+      <div>
+        <ol className="flex gap-1.5">
+          {STEPS.map((label, i) => (
+            <li
+              key={label}
+              className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-accent" : "bg-ink/10"}`}
+              aria-label={`${label}${i === step ? " (current step)" : ""}`}
+            />
+          ))}
+        </ol>
+        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-ink/50">
+          Step {step + 1} of {STEPS.length} · {STEPS[step]}
+        </p>
+      </div>
+
+      {/* Step 1: trade */}
       <fieldset className={step === 0 ? "" : "hidden"}>
         <legend className="text-lg font-semibold mb-3">
           What do you need done?
@@ -68,6 +145,7 @@ export default function PostJobForm({
             </label>
           ))}
         </div>
+        {errors.category && <p className={errCls}>{errors.category}</p>}
       </fieldset>
 
       {/* Step 2: details */}
@@ -83,6 +161,7 @@ export default function PostJobForm({
             className={inputCls}
             placeholder="e.g. Leaking radiator valve"
           />
+          {errors.title && <p className={errCls}>{errors.title}</p>}
         </div>
         {selected?.questions.map((q) => (
           <div key={q.key}>
@@ -120,17 +199,22 @@ export default function PostJobForm({
               <option key={c}>{c}</option>
             ))}
           </select>
+          {errors.county && <p className={errCls}>{errors.county}</p>}
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelCls} htmlFor="town">Town or area</label>
-            <input id="town" name="town" className={inputCls} />
+            <input id="town" name="town" className={inputCls} placeholder="e.g. Drumcondra" />
           </div>
           <div>
             <label className={labelCls} htmlFor="eircode">Eircode (optional)</label>
             <input id="eircode" name="eircode" className={inputCls} placeholder="D01 X2Y3" />
           </div>
         </div>
+        <p className="text-xs text-ink/50">
+          Adding a town or eircode matches you with trades within range, not just
+          the county.
+        </p>
       </fieldset>
 
       {/* Step 4: timing + budget */}
@@ -170,6 +254,7 @@ export default function PostJobForm({
         <div>
           <label className={labelCls} htmlFor="customerName">Name</label>
           <input id="customerName" name="customerName" className={inputCls} />
+          {errors.customerName && <p className={errCls}>{errors.customerName}</p>}
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -179,8 +264,10 @@ export default function PostJobForm({
           <div>
             <label className={labelCls} htmlFor="customerEmail">Email</label>
             <input id="customerEmail" name="customerEmail" type="email" className={inputCls} />
+            {errors.customerEmail && <p className={errCls}>{errors.customerEmail}</p>}
           </div>
         </div>
+        {errors.customerContact && <p className={errCls}>{errors.customerContact}</p>}
         <div>
           <span className={labelCls}>How should trades contact you?</span>
           <div className="grid grid-cols-3 gap-2">
@@ -212,6 +299,7 @@ export default function PostJobForm({
             about this job, by my chosen method above. Required.
           </span>
         </label>
+        {errors.consent && <p className={errCls}>{errors.consent}</p>}
         <label className="flex items-start gap-2.5 text-sm">
           <input type="checkbox" name="consentReviewContact" className="mt-0.5 accent-[#f2a20c]" />
           <span>
@@ -220,11 +308,34 @@ export default function PostJobForm({
         </label>
       </fieldset>
 
+      {/* Step 6: review */}
+      <fieldset className={step === 5 ? "space-y-4" : "hidden"}>
+        <legend className="text-lg font-semibold mb-3">Review &amp; post</legend>
+        <p className="text-sm text-ink/60">
+          Quick check before it goes to local trades. You can go back to change
+          anything.
+        </p>
+        <div className="rounded-xl border border-ink/10 bg-white divide-y divide-ink/5">
+          {reviewRows.map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-4 px-4 py-2.5 text-sm">
+              <span className="text-ink/50">{label}</span>
+              <span className="font-medium text-right">{value}</span>
+            </div>
+          ))}
+        </div>
+        {values.description && (
+          <div className="rounded-xl border border-ink/10 bg-white px-4 py-3 text-sm">
+            <p className="text-ink/50 mb-1">Description</p>
+            <p>{values.description}</p>
+          </div>
+        )}
+      </fieldset>
+
       {/* Nav */}
       <div className="flex justify-between pt-2">
         <button
           type="button"
-          onClick={() => setStep((s) => Math.max(0, s - 1))}
+          onClick={goBack}
           className={`rounded-lg border border-ink/20 px-5 py-2.5 font-medium ${step === 0 ? "invisible" : ""}`}
         >
           Back
@@ -232,9 +343,8 @@ export default function PostJobForm({
         {step < STEPS.length - 1 ? (
           <button
             type="button"
-            onClick={() => setStep((s) => s + 1)}
-            disabled={step === 0 && !category}
-            className="rounded-lg bg-ink text-white px-5 py-2.5 font-medium disabled:opacity-40"
+            onClick={goNext}
+            className="rounded-lg bg-ink text-white px-5 py-2.5 font-medium hover:bg-ink-light"
           >
             Continue
           </button>
@@ -242,7 +352,7 @@ export default function PostJobForm({
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-lg bg-accent hover:bg-accent-dark text-ink px-5 py-2.5 font-semibold disabled:opacity-50"
+            className="rounded-lg bg-accent hover:bg-accent-dark text-ink px-6 py-2.5 font-semibold disabled:opacity-50"
           >
             {isPending ? "Posting..." : "Post my job"}
           </button>

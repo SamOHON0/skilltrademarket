@@ -54,8 +54,19 @@ export async function submitJob(
   if (!input.consentShareContact)
     return { error: "You need to agree to share your details with matched trades." };
 
-  const job = await getDataStore().createJob(input);
-  redirect(`/jobs/${job.manageToken}`);
+  let manageToken: string;
+  try {
+    const job = await getDataStore().createJob(input);
+    manageToken = job.manageToken;
+  } catch (err) {
+    console.error("createJob failed:", err);
+    return {
+      error:
+        "Something went wrong posting your job. Please try again in a moment.",
+    };
+  }
+  // redirect must be outside the try: it works by throwing internally.
+  redirect(`/jobs/${manageToken}`);
 }
 
 export async function unlockJobAction(jobId: string, tradeId: string) {

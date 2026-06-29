@@ -9,14 +9,31 @@ export const metadata = { title: "Your job | Skill Trade" };
 
 const STATUS_COPY: Record<string, string> = {
   pending_review:
-    "Our team is reviewing your job. We may give you a quick call if we need more detail. It will go out to matched trades shortly.",
-  live: "Your job is live. Matched local trades are being notified now; the first five to claim it will contact you directly.",
+    "Our team is reviewing your job. We may call if we need more detail, then it goes out to matched trades.",
+  live: "Your job is live. Matched local trades are being notified; the first five to claim it contact you directly.",
   fully_claimed:
-    "Five tradespeople have claimed your job and have your contact details. Expect to hear from them soon if you have not already.",
+    "Five tradespeople have your details. Expect to hear from them shortly if you haven't already.",
   expired:
     "This job expired without being claimed. You can post it again with more detail or a wider area.",
   completed: "This job is marked complete. Thanks for using Skill Trade.",
-  removed: "This job was cancelled. Contact us if you think that is a mistake.",
+  removed: "This job was cancelled. Contact us if you think that's a mistake.",
+};
+
+const STATUS_PILL: Record<string, string> = {
+  pending_review: "bg-amber-100 text-amber-800",
+  live: "bg-green-100 text-green-800",
+  fully_claimed: "bg-blue-100 text-blue-800",
+  expired: "bg-ink/10 text-ink/60",
+  completed: "bg-green-100 text-green-800",
+  removed: "bg-red-100 text-red-700",
+};
+
+const STEPS = ["Posted", "In review", "Live", "Claimed", "Complete"];
+const STEP_INDEX: Record<string, number> = {
+  pending_review: 1,
+  live: 2,
+  fully_claimed: 3,
+  completed: 4,
 };
 
 export default async function ManageJobPage({
@@ -42,29 +59,80 @@ export default async function ManageJobPage({
   const canComplete =
     !expired && (job.status === "live" || job.status === "fully_claimed");
 
+  const showStepper = effectiveStatus in STEP_INDEX;
+  const activeStep = STEP_INDEX[effectiveStatus] ?? 0;
+  const postedOn = new Date(job.createdAt).toLocaleDateString("en-IE", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-10">
       <p className="text-sm font-semibold uppercase tracking-wide text-accent-dark">
-        Job posted
+        Your job
       </p>
-      <h1 className="mt-1 text-3xl font-bold">{job.title}</h1>
+      <div className="mt-1 flex flex-wrap items-center gap-3">
+        <h1 className="text-3xl font-bold">{job.title}</h1>
+        <UrgencyBadge urgency={job.urgency} />
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_PILL[effectiveStatus]}`}
+        >
+          {effectiveStatus.replace("_", " ")}
+        </span>
+      </div>
+
+      {/* Progress timeline */}
+      {showStepper && (
+        <ol className="mt-6 flex items-center">
+          {STEPS.map((label, i) => {
+            const done = i <= activeStep;
+            return (
+              <li key={label} className="flex-1 flex items-center last:flex-none">
+                <div className="flex flex-col items-center">
+                  <span
+                    className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${
+                      done ? "bg-accent text-ink" : "bg-ink/10 text-ink/40"
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  <span
+                    className={`mt-1 text-[11px] font-medium ${done ? "text-ink" : "text-ink/40"}`}
+                  >
+                    {label}
+                  </span>
+                </div>
+                {i < STEPS.length - 1 && (
+                  <span
+                    className={`mx-1 h-0.5 flex-1 ${i < activeStep ? "bg-accent" : "bg-ink/10"}`}
+                  />
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
 
       <div className="mt-6 rounded-xl bg-white p-6 shadow-sm">
         <p className="font-medium">{STATUS_COPY[effectiveStatus]}</p>
         <dl className="mt-4 grid grid-cols-2 gap-y-2 text-sm text-ink/70">
-          <dt>Status</dt>
-          <dd className="font-medium text-ink">{effectiveStatus.replace("_", " ")}</dd>
           <dt>Location</dt>
           <dd className="font-medium text-ink">
             {[job.town, job.county].filter(Boolean).join(", ")}
           </dd>
           <dt>Timing</dt>
-          <dd className="font-medium text-ink flex items-center gap-2">
-            <UrgencyBadge urgency={job.urgency} />
-            {URGENCY_LABELS[job.urgency]}
-          </dd>
+          <dd className="font-medium text-ink">{URGENCY_LABELS[job.urgency]}</dd>
+          {job.budgetBand && (
+            <>
+              <dt>Budget</dt>
+              <dd className="font-medium text-ink">{job.budgetBand}</dd>
+            </>
+          )}
           <dt>Trades claimed</dt>
           <dd className="font-medium text-ink">{job.unlockCount} of 5</dd>
+          <dt>Posted</dt>
+          <dd className="font-medium text-ink">{postedOn}</dd>
         </dl>
       </div>
 
@@ -82,17 +150,16 @@ export default async function ManageJobPage({
 
       {claimants.length > 0 && (
         <div className="mt-6 rounded-xl bg-white p-6 shadow-sm">
-          <h2 className="font-semibold">Trades who have your details</h2>
+          <h2 className="font-semibold">
+            Trades who have your details ({claimants.length})
+          </h2>
           <p className="mt-1 text-sm text-ink/60">
-            These businesses claimed your job and will be in touch. Expect them
-            to contact you the way you asked.
+            These businesses claimed your job and will be in touch your chosen
+            way.
           </p>
           <ul className="mt-4 space-y-2">
             {claimants.map((c, i) => (
-              <li
-                key={i}
-                className="flex items-center gap-2 text-sm font-medium"
-              >
+              <li key={i} className="flex items-center gap-2 text-sm font-medium">
                 {c.businessName}
                 {c.verified && (
                   <span className="rounded-full bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5">
@@ -128,8 +195,9 @@ export default async function ManageJobPage({
       )}
 
       <p className="mt-6 text-sm text-ink/60">
-        Bookmark this page. It is your private link to manage this job and leave
-        a review once the work is done. Reviews open after completion (Phase 4).
+        Bookmark this page, it&apos;s your private link to manage this job and
+        leave a review once the work is done. Reviews open after completion
+        (Phase 4).
       </p>
     </div>
   );
