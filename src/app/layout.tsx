@@ -83,9 +83,8 @@ export default async function RootLayout({
                 </Link>
               ))}
             </nav>
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
+            <div className="mt-6 border-t border-white/10 pt-6">
               <p>Skill Trade. No hidden fees. No dead leads.</p>
-              <p>Built by SquareTwo</p>
             </div>
           </div>
         </footer>
