@@ -11,6 +11,7 @@ import type {
   UnlockResult,
 } from "../types";
 import {
+  AUTO_APPROVE_JOBS,
   JOB_EXPIRY_DAYS,
   JOB_UNLOCK_CAP,
   MATCH_RADIUS_KM,
@@ -280,9 +281,11 @@ export const mockStore: DataStore = {
     const job = makeJob({
       id,
       ...input,
-      status: "pending_review", // admin approval queue per PRD decision 2
-      releasedAt: null,
-      expiresAt: null,
+      // Auto-approve sends the job straight to the feed; otherwise it waits in
+      // the admin review queue.
+      status: AUTO_APPROVE_JOBS ? "live" : "pending_review",
+      releasedAt: AUTO_APPROVE_JOBS ? new Date().toISOString() : null,
+      expiresAt: AUTO_APPROVE_JOBS ? daysFromNow(JOB_EXPIRY_DAYS) : null,
       manageToken: `token-${id}`,
       unlockCount: 0,
     });

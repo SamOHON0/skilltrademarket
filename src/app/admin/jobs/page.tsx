@@ -1,6 +1,6 @@
 import { getDataStore } from "@/lib/data";
 import { approveJobAction, rejectJobAction } from "@/app/actions";
-import { URGENCY_LABELS } from "@/lib/constants";
+import { URGENCY_LABELS, AUTO_APPROVE_JOBS } from "@/lib/constants";
 
 export const metadata = { title: "Job queue | Skill Trade admin" };
 
@@ -13,9 +13,15 @@ export default async function AdminJobsPage() {
     <div>
       <h1 className="text-2xl font-bold">Job queue</h1>
       <p className="mt-1 text-sm text-ink/60">
-        Every job is reviewed before release (chase thin ones by phone, that is
-        the promise). Approval releases it to matched trades with tier offsets.
+        Approval releases a job to matched trades with tier offsets.
       </p>
+      {AUTO_APPROVE_JOBS && (
+        <p className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2.5 text-sm text-amber-900">
+          Auto-approval is on: posted jobs go live immediately, so this queue
+          will usually be empty. Turn it off in constants.ts to review jobs
+          manually.
+        </p>
+      )}
 
       <h2 className="mt-8 font-semibold">
         Awaiting review ({pending.length})

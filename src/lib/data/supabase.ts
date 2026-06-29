@@ -28,6 +28,7 @@ import type {
   UnlockResult,
 } from "../types";
 import {
+  AUTO_APPROVE_JOBS,
   JOB_EXPIRY_DAYS,
   MATCH_RADIUS_KM,
   TIER_RELEASE_OFFSETS_MINUTES,
@@ -164,6 +165,8 @@ export const supabaseStore: DataStore = {
   async createJob(input: NewJobInput) {
     const db = createServiceClient();
     const coords = await geocode([input.eircode, input.town, input.county]);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + JOB_EXPIRY_DAYS * 86_400_000);
     const { data, error } = await db
       .from("jobs")
       .insert({
@@ -184,7 +187,10 @@ export const supabaseStore: DataStore = {
         consent_review_contact: input.consentReviewContact,
         lat: coords?.lat ?? null,
         lng: coords?.lng ?? null,
-        status: "pending_review", // admin approval queue (PRD decision 2)
+        // Auto-approve straight to live, or hold in the admin review queue.
+        status: AUTO_APPROVE_JOBS ? "live" : "pending_review",
+        released_at: AUTO_APPROVE_JOBS ? now.toISOString() : null,
+        expires_at: AUTO_APPROVE_JOBS ? expiresAt.toISOString() : null,
       })
       .select("*")
       .single();

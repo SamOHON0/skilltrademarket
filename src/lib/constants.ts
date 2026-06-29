@@ -19,6 +19,9 @@ export const UNLOCK_ALLOWANCES_MONTHLY: Record<Tier, number | null> = {
 export const JOB_UNLOCK_CAP = 5;
 export const MATCH_RADIUS_KM = 12; // distance matching radius, km
 export const JOB_EXPIRY_DAYS = 7;
+// Auto-approve posted jobs straight to live (skip the admin review queue).
+// Flip to false to restore the manual approval queue.
+export const AUTO_APPROVE_JOBS = true;
 export const ADMIN_ESCALATION_HOURS = 48;
 
 export const TIER_PRICES_EUR: Record<Tier, number> = {
