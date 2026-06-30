@@ -24,6 +24,11 @@ export async function signUpTrade(
   const counties = formData.getAll("counties").map(String);
   const baseEircode = String(formData.get("baseEircode") ?? "").trim();
   const baseTown = String(formData.get("baseTown") ?? "").trim();
+  const radiusRaw = String(formData.get("matchRadiusKm") ?? "").trim();
+  const matchRadiusKm =
+    radiusRaw === "" || Number.isNaN(Number(radiusRaw))
+      ? null
+      : Math.max(0, Math.min(100, Math.round(Number(radiusRaw))));
 
   if (!email || !email.includes("@")) return { error: "Enter a valid email." };
   if (password.length < 8)
@@ -58,6 +63,7 @@ export async function signUpTrade(
     counties,
     base_eircode: baseEircode || null,
     base_town: baseTown || null,
+    match_radius_km: matchRadiusKm,
     lat: coords?.lat ?? null,
     lng: coords?.lng ?? null,
     tier: "basic",

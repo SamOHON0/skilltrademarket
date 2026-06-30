@@ -47,6 +47,7 @@ export interface TradesPerson {
   lng: number | null;
   baseEircode: string | null;
   baseTown: string | null;
+  matchRadiusKm: number | null;
   createdAt: string;
 }
 

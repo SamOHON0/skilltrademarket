@@ -8,7 +8,7 @@ import {
   URGENCY_LABELS,
   MATCH_RADIUS_KM,
 } from "@/lib/constants";
-import { jobDistanceKm } from "@/lib/geo";
+import { jobDistanceKm, effectiveRadiusKm } from "@/lib/geo";
 import UnlockButton from "./UnlockButton";
 import ContactButtons from "@/components/ContactButtons";
 import UrgencyBadge from "@/components/UrgencyBadge";
@@ -76,6 +76,11 @@ export default async function FeedPage({
   const pending = trade
     ? trade.status !== "active" || !trade.subscriptionActive
     : false;
+  const radiusText = trade
+    ? effectiveRadiusKm(trade, MATCH_RADIUS_KM) === 0
+      ? "anywhere in Ireland"
+      : `within ${effectiveRadiusKm(trade, MATCH_RADIUS_KM)} km of your base`
+    : "";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -129,8 +134,8 @@ export default async function FeedPage({
 
       {trade && (
         <p className="mt-4 text-xs text-ink/50">
-          Showing jobs within {MATCH_RADIUS_KM} km of your base (or in your
-          counties where we don&apos;t have an exact location).
+          Showing jobs {radiusText} (or in your counties where we don&apos;t
+          have an exact location).
         </p>
       )}
 
@@ -209,8 +214,8 @@ export default async function FeedPage({
         })}
         {trade && feed.length === 0 && (
           <p className="text-ink/60">
-            No jobs match your trade within {MATCH_RADIUS_KM} km right now. Higher
-            tiers see new jobs sooner.
+            No jobs match your trade {radiusText} right now. Higher tiers see new
+            jobs sooner.
           </p>
         )}
       </div>

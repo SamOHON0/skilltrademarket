@@ -70,6 +70,7 @@ function toTrade(r: Row): TradesPerson {
     lng: (r.lng as number | null) ?? null,
     baseEircode: (r.base_eircode as string | null) ?? null,
     baseTown: (r.base_town as string | null) ?? null,
+    matchRadiusKm: (r.match_radius_km as number | null) ?? null,
     createdAt: r.created_at as string,
   };
 }

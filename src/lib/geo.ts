@@ -19,7 +19,10 @@ export function distanceKm(
 }
 
 type JobLoc = Pick<Job, "lat" | "lng" | "county">;
-type TradeLoc = Pick<TradesPerson, "lat" | "lng" | "counties">;
+type TradeLoc = Pick<
+  TradesPerson,
+  "lat" | "lng" | "counties" | "matchRadiusKm"
+>;
 
 // Distance between a job and a trade, or null if either lacks coordinates.
 export function jobDistanceKm(
@@ -31,13 +34,25 @@ export function jobDistanceKm(
   return distanceKm(job.lat, job.lng, trade.lat, trade.lng);
 }
 
-// Distance when both have coordinates; otherwise fall back to county overlap.
+// Effective radius for a trade: their chosen value, or the platform default.
+// 0 means "anywhere in Ireland" (no distance limit).
+export function effectiveRadiusKm(
+  trade: Pick<TradesPerson, "matchRadiusKm">,
+  defaultRadiusKm: number
+): number {
+  return trade.matchRadiusKm == null ? defaultRadiusKm : trade.matchRadiusKm;
+}
+
+// Match within the trade's radius when both have coordinates; fall back to
+// county overlap when a location is missing. Radius 0 = match anywhere.
 export function matchesLocation(
   job: JobLoc,
   trade: TradeLoc,
-  radiusKm: number
+  defaultRadiusKm: number
 ): boolean {
+  const radius = effectiveRadiusKm(trade, defaultRadiusKm);
+  if (radius === 0) return true;
   const d = jobDistanceKm(job, trade);
-  if (d != null) return d <= radiusKm;
+  if (d != null) return d <= radius;
   return trade.counties.includes(job.county);
 }

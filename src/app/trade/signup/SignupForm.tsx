@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { signUpTrade, type AuthState } from "@/app/auth-actions";
-import { COUNTIES } from "@/lib/constants";
+import { COUNTIES, RADIUS_OPTIONS } from "@/lib/constants";
 import type { TradeCategory } from "@/lib/types";
 
 const inputCls =
@@ -77,9 +77,28 @@ export default function SignupForm({
         </div>
       </div>
       <p className="-mt-3 text-xs text-ink/50">
-        We use this to show you jobs within 12 km. Leave blank and we match you
-        by county instead.
+        Used with your travel radius to match you with nearby jobs. Leave blank
+        and we match you by county.
       </p>
+
+      <div>
+        <label className={labelCls} htmlFor="matchRadiusKm">
+          How far will you travel?
+        </label>
+        <select
+          id="matchRadiusKm"
+          name="matchRadiusKm"
+          defaultValue="25"
+          className={inputCls}
+        >
+          {RADIUS_OPTIONS.map((km) => (
+            <option key={km} value={km}>
+              {km} km
+            </option>
+          ))}
+          <option value="0">Anywhere in Ireland</option>
+        </select>
+      </div>
 
       <fieldset>
         <legend className="text-sm font-medium mb-2">

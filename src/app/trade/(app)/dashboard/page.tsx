@@ -7,8 +7,9 @@ import { setOutcomeAction } from "@/app/actions";
 import ContactButtons from "@/components/ContactButtons";
 import UrgencyBadge from "@/components/UrgencyBadge";
 import JobMap from "@/components/JobMap";
-import { jobDistanceKm } from "@/lib/geo";
+import { jobDistanceKm, effectiveRadiusKm } from "@/lib/geo";
 import {
+  MATCH_RADIUS_KM,
   TIER_LABELS,
   UNLOCK_ALLOWANCES_MONTHLY,
   URGENCY_LABELS,
@@ -242,6 +243,14 @@ export default async function DashboardPage() {
               <dd className="font-medium">
                 {trade.baseTown || trade.baseEircode || "Not set"}
                 {trade.lat != null ? "" : " (county matching)"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-ink/50">Travel radius</dt>
+              <dd className="font-medium">
+                {effectiveRadiusKm(trade, MATCH_RADIUS_KM) === 0
+                  ? "Anywhere in Ireland"
+                  : `${effectiveRadiusKm(trade, MATCH_RADIUS_KM)} km`}
               </dd>
             </div>
             <div>

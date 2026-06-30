@@ -17,7 +17,9 @@ export const UNLOCK_ALLOWANCES_MONTHLY: Record<Tier, number | null> = {
 };
 
 export const JOB_UNLOCK_CAP = 5;
-export const MATCH_RADIUS_KM = 12; // distance matching radius, km
+export const MATCH_RADIUS_KM = 12; // default distance radius, km
+// Selectable travel radii for trades (km). 0 is treated as 'anywhere in Ireland'.
+export const RADIUS_OPTIONS = [5, 10, 15, 25, 50, 100] as const;
 export const JOB_EXPIRY_DAYS = 7;
 // Auto-approve posted jobs straight to live (skip the admin review queue).
 // Flip to false to restore the manual approval queue.
