@@ -41,6 +41,12 @@ export default async function AdminJobsPage() {
                   {job.customerName} &middot; {job.customerPhone} &middot;{" "}
                   {job.customerEmail}
                 </p>
+                {job.aiDecision === "review" && (
+                  <p className="mt-1 text-xs font-semibold text-amber-700">
+                    AI flagged for review
+                    {job.aiReasons.length ? `: ${job.aiReasons.join(", ")}` : ""}
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                 <form action={approveJobAction}>

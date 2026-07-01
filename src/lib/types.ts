@@ -76,6 +76,9 @@ export interface Job {
   expiresAt: string | null;
   lat: number | null;
   lng: number | null;
+  aiDecision: string | null;
+  aiReasons: string[];
+  moderatedAt: string | null;
   createdAt: string;
 }
 
@@ -103,6 +106,21 @@ export interface JobClaimant {
   businessName: string;
   tier: Tier;
   verified: boolean;
+}
+
+export interface LeadReport {
+  id: string;
+  jobId: string;
+  tradeId: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+}
+
+/** Lead report with job + trade names, for the admin list. */
+export interface LeadReportView extends LeadReport {
+  jobTitle: string;
+  tradeName: string;
 }
 
 export interface Review {

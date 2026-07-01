@@ -7,6 +7,7 @@ import { setOutcomeAction } from "@/app/actions";
 import ContactButtons from "@/components/ContactButtons";
 import UrgencyBadge from "@/components/UrgencyBadge";
 import JobMap from "@/components/JobMap";
+import ReportLeadButton from "@/components/ReportLeadButton";
 import { jobDistanceKm, effectiveRadiusKm } from "@/lib/geo";
 import {
   MATCH_RADIUS_KM,
@@ -53,10 +54,12 @@ export default async function DashboardPage() {
   }
 
   const store = getDataStore();
-  const [feed, unlocks] = await Promise.all([
+  const [feed, unlocks, reportedIds] = await Promise.all([
     store.getFeed(trade.id),
     store.getUnlocks(trade.id),
+    store.getTradeReportedJobIds(trade.id),
   ]);
+  const reportedSet = new Set(reportedIds);
 
   const allowance = UNLOCK_ALLOWANCES_MONTHLY[trade.tier];
   const monthStart = new Date();
@@ -222,6 +225,13 @@ export default async function DashboardPage() {
                         Save
                       </button>
                     </form>
+                    <div className="mt-2">
+                      <ReportLeadButton
+                        jobId={u.job.id}
+                        tradeId={trade.id}
+                        reported={reportedSet.has(u.job.id)}
+                      />
+                    </div>
                   </li>
                 );
               })}

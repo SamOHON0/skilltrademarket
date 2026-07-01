@@ -13,6 +13,7 @@ const nav: [string, string][] = [
   ["/admin/trades", "Trades"],
   ["/admin/verification", "Verification"],
   ["/admin/reviews", "Reviews"],
+  ["/admin/reports", "Lead reports"],
   ["/admin/leaderboard", "Leaderboard"],
   ["/admin/settings", "Settings"],
 ];

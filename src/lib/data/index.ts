@@ -2,6 +2,7 @@ import type {
   FeedJob,
   Job,
   JobClaimant,
+  LeadReportView,
   NewJobInput,
   Review,
   Tier,
@@ -12,6 +13,7 @@ import type {
   UnlockOutcome,
   UnlockResult,
 } from "../types";
+import type { ModerationResult } from "../moderation";
 
 /**
  * Data access contract. The app talks only to this interface.
@@ -23,7 +25,7 @@ export interface DataStore {
   getCategories(): Promise<TradeCategory[]>;
 
   // Customer side (no accounts; jobs keyed to manage token)
-  createJob(input: NewJobInput): Promise<Job>;
+  createJob(input: NewJobInput, moderation?: ModerationResult): Promise<Job>;
   getJobByToken(token: string): Promise<Job | null>;
   cancelJobByToken(token: string): Promise<void>;
   completeJobByToken(token: string): Promise<void>;
@@ -46,6 +48,11 @@ export interface DataStore {
   setTradeTier(tradeId: string, tier: Tier): Promise<void>;
   setTradeVerified(tradeId: string, verified: boolean): Promise<void>;
   getReviews(): Promise<Review[]>;
+
+  // Trust & quality: dead-lead reports
+  reportLead(jobId: string, tradeId: string, reason: string): Promise<void>;
+  getTradeReportedJobIds(tradeId: string): Promise<string[]>;
+  getLeadReports(): Promise<LeadReportView[]>;
 }
 
 import { mockStore } from "./mock";

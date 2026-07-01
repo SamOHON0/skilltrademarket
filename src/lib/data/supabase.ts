@@ -35,6 +35,7 @@ import {
 } from "../constants";
 import { matchesLocation } from "../geo";
 import { geocode } from "../geocode";
+import type { ModerationResult } from "../moderation";
 import { createServiceClient } from "../supabase/server";
 
 // ---------- row mappers (snake_case DB -> camelCase domain) ----------
@@ -101,6 +102,9 @@ function toJob(r: Row): Job {
     expiresAt: (r.expires_at as string | null) ?? null,
     lat: (r.lat as number | null) ?? null,
     lng: (r.lng as number | null) ?? null,
+    aiDecision: (r.ai_decision as string | null) ?? null,
+    aiReasons: (r.ai_reasons as string[] | null) ?? [],
+    moderatedAt: (r.moderated_at as string | null) ?? null,
     createdAt: r.created_at as string,
   };
 }
@@ -163,11 +167,13 @@ export const supabaseStore: DataStore = {
     return (data ?? []).map(toCategory);
   },
 
-  async createJob(input: NewJobInput) {
+  async createJob(input: NewJobInput, moderation?: ModerationResult) {
     const db = createServiceClient();
     const coords = await geocode([input.eircode, input.town, input.county]);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + JOB_EXPIRY_DAYS * 86_400_000);
+    const review = moderation?.decision === "review";
+    const live = !review && AUTO_APPROVE_JOBS;
     const { data, error } = await db
       .from("jobs")
       .insert({
@@ -188,10 +194,13 @@ export const supabaseStore: DataStore = {
         consent_review_contact: input.consentReviewContact,
         lat: coords?.lat ?? null,
         lng: coords?.lng ?? null,
-        // Auto-approve straight to live, or hold in the admin review queue.
-        status: AUTO_APPROVE_JOBS ? "live" : "pending_review",
-        released_at: AUTO_APPROVE_JOBS ? now.toISOString() : null,
-        expires_at: AUTO_APPROVE_JOBS ? expiresAt.toISOString() : null,
+        // Live unless AI flagged for review or auto-approve is off.
+        status: live ? "live" : "pending_review",
+        released_at: live ? now.toISOString() : null,
+        expires_at: live ? expiresAt.toISOString() : null,
+        ai_decision: moderation?.decision ?? null,
+        ai_reasons: moderation?.reasons ?? null,
+        moderated_at: moderation ? now.toISOString() : null,
       })
       .select("*")
       .single();
@@ -434,5 +443,51 @@ export const supabaseStore: DataStore = {
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data ?? []).map(toReview);
+  },
+
+  async reportLead(jobId: string, tradeId: string, reason: string) {
+    const db = createServiceClient();
+    const { error } = await db
+      .from("lead_reports")
+      .upsert(
+        { job_id: jobId, trade_id: tradeId, reason },
+        { onConflict: "job_id,trade_id", ignoreDuplicates: true }
+      );
+    if (error) throw error;
+  },
+
+  async getTradeReportedJobIds(tradeId: string) {
+    const db = createServiceClient();
+    const { data, error } = await db
+      .from("lead_reports")
+      .select("job_id")
+      .eq("trade_id", tradeId);
+    if (error) throw error;
+    return (data ?? []).map((r) => r.job_id as string);
+  },
+
+  async getLeadReports() {
+    const db = createServiceClient();
+    const { data, error } = await db
+      .from("lead_reports")
+      .select("*, job:jobs(title), trade:trades_people(business_name)")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((r) => {
+      const job = (Array.isArray(r.job) ? r.job[0] : r.job) as Row | undefined;
+      const trade = (Array.isArray(r.trade) ? r.trade[0] : r.trade) as
+        | Row
+        | undefined;
+      return {
+        id: r.id as string,
+        jobId: r.job_id as string,
+        tradeId: r.trade_id as string,
+        reason: r.reason as string,
+        status: r.status as string,
+        createdAt: r.created_at as string,
+        jobTitle: (job?.title as string) ?? (r.job_id as string),
+        tradeName: (trade?.business_name as string) ?? (r.trade_id as string),
+      };
+    });
   },
 };

@@ -9,6 +9,7 @@ import type {
   Unlock,
   UnlockOutcome,
   UnlockResult,
+  LeadReport,
 } from "../types";
 import {
   AUTO_APPROVE_JOBS,
@@ -19,6 +20,7 @@ import {
   UNLOCK_ALLOWANCES_MONTHLY,
 } from "../constants";
 import { matchesLocation } from "../geo";
+import type { ModerationResult } from "../moderation";
 
 // ---------- seed data ----------
 
@@ -73,6 +75,9 @@ function makeJob(partial: Partial<Job> & Pick<Job, "id" | "category" | "title" |
     expiresAt: daysFromNow(JOB_EXPIRY_DAYS),
     lat: null,
     lng: null,
+    aiDecision: null,
+    aiReasons: [],
+    moderatedAt: null,
     createdAt: minsAgo(120),
     ...partial,
   };
@@ -83,6 +88,7 @@ interface Db {
   trades: TradesPerson[];
   unlocks: Unlock[];
   reviews: Review[];
+  leadReports: LeadReport[];
 }
 
 function seed(): Db {
@@ -240,6 +246,7 @@ function seed(): Db {
         createdAt: minsAgo(60 * 24 * 2),
       },
     ],
+    leadReports: [],
   };
 }
 
@@ -279,16 +286,20 @@ export const mockStore: DataStore = {
     return categories;
   },
 
-  async createJob(input: NewJobInput) {
+  async createJob(input: NewJobInput, moderation?: ModerationResult) {
     const id = `job-${Date.now()}`;
+    // AI sent it for review, or auto-approve is off, holds it in the queue.
+    const review = moderation?.decision === "review";
+    const live = !review && AUTO_APPROVE_JOBS;
     const job = makeJob({
       id,
       ...input,
-      // Auto-approve sends the job straight to the feed; otherwise it waits in
-      // the admin review queue.
-      status: AUTO_APPROVE_JOBS ? "live" : "pending_review",
-      releasedAt: AUTO_APPROVE_JOBS ? new Date().toISOString() : null,
-      expiresAt: AUTO_APPROVE_JOBS ? daysFromNow(JOB_EXPIRY_DAYS) : null,
+      status: live ? "live" : "pending_review",
+      releasedAt: live ? new Date().toISOString() : null,
+      expiresAt: live ? daysFromNow(JOB_EXPIRY_DAYS) : null,
+      aiDecision: moderation?.decision ?? null,
+      aiReasons: moderation?.reasons ?? [],
+      moderatedAt: moderation ? new Date().toISOString() : null,
       manageToken: `token-${id}`,
       unlockCount: 0,
     });
@@ -446,5 +457,36 @@ export const mockStore: DataStore = {
 
   async getReviews() {
     return [...db.reviews];
+  },
+
+  async reportLead(jobId: string, tradeId: string, reason: string) {
+    if (db.leadReports.some((r) => r.jobId === jobId && r.tradeId === tradeId))
+      return;
+    db.leadReports.push({
+      id: `report-${Date.now()}`,
+      jobId,
+      tradeId,
+      reason,
+      status: "open",
+      createdAt: new Date().toISOString(),
+    });
+  },
+
+  async getTradeReportedJobIds(tradeId: string) {
+    return db.leadReports
+      .filter((r) => r.tradeId === tradeId)
+      .map((r) => r.jobId);
+  },
+
+  async getLeadReports() {
+    return db.leadReports
+      .slice()
+      .reverse()
+      .map((r) => ({
+        ...r,
+        jobTitle: db.jobs.find((j) => j.id === r.jobId)?.title ?? r.jobId,
+        tradeName:
+          db.trades.find((t) => t.id === r.tradeId)?.businessName ?? r.tradeId,
+      }));
   },
 };

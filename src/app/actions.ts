@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getDataStore } from "@/lib/data";
+import { moderateJob } from "@/lib/moderation";
 import type {
   ContactMethod,
   JobUrgency,
@@ -54,9 +55,18 @@ export async function submitJob(
   if (!input.consentShareContact)
     return { error: "You need to agree to share your details with matched trades." };
 
+  // AI moderation (no-op if no ANTHROPIC_API_KEY): approve | review | reject.
+  const moderation = await moderateJob(input);
+  if (moderation.decision === "reject") {
+    const reason = moderation.reasons[0] ? `: ${moderation.reasons[0]}` : "";
+    return {
+      error: `This job couldn't be posted as written${reason}. Please reword it and try again.`,
+    };
+  }
+
   let manageToken: string;
   try {
-    const job = await getDataStore().createJob(input);
+    const job = await getDataStore().createJob(input, moderation);
     manageToken = job.manageToken;
   } catch (err) {
     console.error("createJob failed:", err);
@@ -99,6 +109,17 @@ export async function approveJobAction(formData: FormData) {
 export async function rejectJobAction(formData: FormData) {
   await getDataStore().rejectJob(String(formData.get("jobId")));
   revalidatePath("/admin/jobs");
+}
+
+export async function reportLeadAction(formData: FormData) {
+  const jobId = String(formData.get("jobId") ?? "");
+  const tradeId = String(formData.get("tradeId") ?? "");
+  const reason = String(formData.get("reason") || "Other");
+  if (!jobId || !tradeId) return;
+  await getDataStore().reportLead(jobId, tradeId, reason);
+  revalidatePath("/trade/dashboard");
+  revalidatePath("/trade/feed");
+  revalidatePath("/admin/reports");
 }
 
 export async function setOutcomeAction(formData: FormData) {
