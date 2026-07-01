@@ -2,6 +2,40 @@
 
 All notable changes to Skill Trade. Newest first.
 
+## [0.9.0] - 2026-07-01 - Phase 2 hardening: privacy, expiry & polish
+
+### Added
+- Real category-specific questions in the mock store, matching
+  `supabase/seed.sql` exactly, so demo and live posting flows are identical.
+- Category answers now appear on the Review step before posting.
+- Feed cards show posted-time, days-to-expiry, slots left, and an
+  "approximate area" note on pre-unlock maps.
+- Feed header shows monthly unlocks remaining, not just the allowance.
+- Two-tap confirm on Unlock ("uses 1 of N left") and on Cancel job, so a
+  stray tap never spends an unlock or kills a live job.
+- Dashboard outcomes are now one-tap Won / Lost / Completed buttons.
+- Customer manage page shows preferred contact method and "live until" date.
+- `expire_jobs()` maintenance function for sweeping stale rows via cron.
+
+### Fixed
+- **Privacy**: trade-facing feed payloads no longer include the customer's
+  eircode, and coordinates are blurred to ~1km until the lead is unlocked.
+  Exact pin only ever renders post-unlock.
+- **Expiry at the unlock boundary**: `unlock_job()` (and the mock mirror) now
+  refuses jobs past `expires_at` and flips them to `expired` under the row
+  lock. Previously an expired-but-live job could still be unlocked.
+- Server-side posting backstop hardened: enum/county whitelists, length
+  caps, phone sanity check, contact-method cross-checks (WhatsApp needs a
+  phone), and answers filtered to the chosen category's questions.
+- Outcome changes now refresh the dashboard, not just the feed.
+- Keyboard/screen-reader focus returns to the step indicator on every
+  posting-form step change.
+
+### Migration
+- `0006_phase2_hardening.sql` (expiry in `unlock_job()`, updated
+  `job_feed()` with radius matching + blurred coordinates, expiry index,
+  `expire_jobs()`).
+
 ## [0.8.0] - 2026-06-30 - Posting refinement, auto-approve & travel radius
 
 ### Added

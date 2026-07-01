@@ -2,8 +2,10 @@ import { notFound } from "next/navigation";
 import { getDataStore } from "@/lib/data";
 import { URGENCY_LABELS, TIER_LABELS } from "@/lib/constants";
 import { cancelJobAction, completeJobAction } from "@/app/actions";
+import { dateIE } from "@/lib/format";
 import UrgencyBadge from "@/components/UrgencyBadge";
 import JobMap from "@/components/JobMap";
+import ConfirmButton from "@/components/ConfirmButton";
 
 export const metadata = { title: "Your job | Skill Trade" };
 
@@ -61,11 +63,16 @@ export default async function ManageJobPage({
 
   const showStepper = effectiveStatus in STEP_INDEX;
   const activeStep = STEP_INDEX[effectiveStatus] ?? 0;
-  const postedOn = new Date(job.createdAt).toLocaleDateString("en-IE", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const postedOn = dateIE(job.createdAt);
+  const liveUntil =
+    !expired && job.expiresAt && (job.status === "live" || job.status === "fully_claimed")
+      ? dateIE(job.expiresAt)
+      : null;
+  const CONTACT_LABELS: Record<string, string> = {
+    whatsapp: "WhatsApp",
+    call: "Phone call",
+    email: "Email",
+  };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -131,8 +138,18 @@ export default async function ManageJobPage({
           )}
           <dt>Trades claimed</dt>
           <dd className="font-medium text-ink">{job.unlockCount} of 5</dd>
+          <dt>How they&apos;ll contact you</dt>
+          <dd className="font-medium text-ink">
+            {CONTACT_LABELS[job.preferredContact]}
+          </dd>
           <dt>Posted</dt>
           <dd className="font-medium text-ink">{postedOn}</dd>
+          {liveUntil && (
+            <>
+              <dt>Live until</dt>
+              <dd className="font-medium text-ink">{liveUntil}</dd>
+            </>
+          )}
         </dl>
       </div>
 
@@ -186,9 +203,11 @@ export default async function ManageJobPage({
           {canCancel && (
             <form action={cancelJobAction}>
               <input type="hidden" name="token" value={token} />
-              <button className="rounded-lg border border-red-300 text-red-700 px-4 py-2.5 text-sm font-semibold hover:bg-red-50">
-                Cancel this job
-              </button>
+              <ConfirmButton
+                label="Cancel this job"
+                confirmLabel="Tap again to cancel it"
+                className="rounded-lg border border-red-300 text-red-700 px-4 py-2.5 text-sm font-semibold hover:bg-red-50"
+              />
             </form>
           )}
         </div>

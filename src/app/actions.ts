@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getDataStore } from "@/lib/data";
 import { moderateJob } from "@/lib/moderation";
+import { COUNTIES } from "@/lib/constants";
 import type {
   ContactMethod,
   JobUrgency,
@@ -15,43 +16,74 @@ import type {
 
 export type JobFormState = { error?: string };
 
+const URGENCIES: JobUrgency[] = ["asap", "this_week", "this_month", "flexible"];
+const CONTACT_METHODS: ContactMethod[] = ["whatsapp", "call", "email"];
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+const clip = (v: FormDataEntryValue | null, max: number) =>
+  String(v ?? "").trim().slice(0, max);
+
 export async function submitJob(
   _prev: JobFormState,
   formData: FormData
 ): Promise<JobFormState> {
+  const store = getDataStore();
+
+  const category = clip(formData.get("category"), 60);
+  const categories = await store.getCategories().catch(() => []);
+  const selected = categories.find((c) => c.slug === category);
+  if (!selected) return { error: "Pick a trade category." };
+
+  // Only keep answers to questions this category actually asks.
   const answers: Record<string, string> = {};
-  for (const [key, value] of formData.entries()) {
-    if (key.startsWith("answer_") && typeof value === "string") {
-      answers[key.replace("answer_", "")] = value;
-    }
+  for (const q of selected.questions) {
+    const value = formData.get(`answer_${q.key}`);
+    if (typeof value === "string" && value.trim())
+      answers[q.key] = value.trim().slice(0, 200);
   }
 
+  const urgencyRaw = String(formData.get("urgency") ?? "");
+  const contactRaw = String(formData.get("preferredContact") ?? "");
+
   const input: NewJobInput = {
-    category: String(formData.get("category") ?? ""),
-    title: String(formData.get("title") ?? ""),
-    description: String(formData.get("description") ?? ""),
+    category,
+    title: clip(formData.get("title"), 120),
+    description: clip(formData.get("description"), 4000),
     answers,
-    county: String(formData.get("county") ?? ""),
-    town: String(formData.get("town") ?? ""),
-    eircode: String(formData.get("eircode") ?? ""),
-    urgency: (formData.get("urgency") ?? "flexible") as JobUrgency,
-    budgetBand: String(formData.get("budgetBand") ?? ""),
-    customerName: String(formData.get("customerName") ?? ""),
-    customerPhone: String(formData.get("customerPhone") ?? ""),
-    customerEmail: String(formData.get("customerEmail") ?? ""),
-    preferredContact: (formData.get("preferredContact") ?? "call") as ContactMethod,
+    county: clip(formData.get("county"), 40),
+    town: clip(formData.get("town"), 80),
+    eircode: clip(formData.get("eircode"), 12).toUpperCase(),
+    urgency: URGENCIES.includes(urgencyRaw as JobUrgency)
+      ? (urgencyRaw as JobUrgency)
+      : "flexible",
+    budgetBand: clip(formData.get("budgetBand"), 40),
+    customerName: clip(formData.get("customerName"), 80),
+    customerPhone: clip(formData.get("customerPhone"), 25),
+    customerEmail: clip(formData.get("customerEmail"), 120),
+    preferredContact: CONTACT_METHODS.includes(contactRaw as ContactMethod)
+      ? (contactRaw as ContactMethod)
+      : "call",
     consentShareContact: formData.get("consentShareContact") === "on",
     consentReviewContact: formData.get("consentReviewContact") === "on",
   };
 
-  if (!input.category) return { error: "Pick a trade category." };
-  if (!input.title.trim()) return { error: "Give the job a short title." };
-  if (!input.county) return { error: "Choose the county the job is in." };
-  if (!input.customerName.trim()) return { error: "Add your name." };
-  if (!input.customerPhone.trim() && !input.customerEmail.trim())
+  if (input.title.length < 4) return { error: "Give the job a short, clear title." };
+  if (!COUNTIES.includes(input.county))
+    return { error: "Choose the county the job is in." };
+  if (!input.customerName) return { error: "Add your name." };
+  if (!input.customerPhone && !input.customerEmail)
     return { error: "Add a phone number or email so trades can reach you." };
-  if (input.customerEmail && !input.customerEmail.includes("@"))
+  if (input.customerPhone) {
+    const digits = input.customerPhone.replace(/\D/g, "");
+    if (digits.length < 7 || digits.length > 15)
+      return { error: "That phone number does not look right." };
+  }
+  if (input.customerEmail && !EMAIL_RE.test(input.customerEmail))
     return { error: "That email address does not look right." };
+  if (input.preferredContact === "whatsapp" && !input.customerPhone)
+    return { error: "WhatsApp needs a phone number. Add one or pick email." };
+  if (input.preferredContact === "email" && !input.customerEmail)
+    return { error: "Add an email address, or pick phone or WhatsApp." };
   if (!input.consentShareContact)
     return { error: "You need to agree to share your details with matched trades." };
 
@@ -66,7 +98,7 @@ export async function submitJob(
 
   let manageToken: string;
   try {
-    const job = await getDataStore().createJob(input, moderation);
+    const job = await store.createJob(input, moderation);
     manageToken = job.manageToken;
   } catch (err) {
     console.error("createJob failed:", err);
@@ -123,10 +155,14 @@ export async function reportLeadAction(formData: FormData) {
 }
 
 export async function setOutcomeAction(formData: FormData) {
+  const outcome = String(formData.get("outcome"));
+  const allowed: UnlockOutcome[] = ["none", "won", "lost", "completed"];
+  if (!allowed.includes(outcome as UnlockOutcome)) return;
   await getDataStore().setUnlockOutcome(
     String(formData.get("unlockId")),
-    String(formData.get("outcome")) as UnlockOutcome
+    outcome as UnlockOutcome
   );
+  revalidatePath("/trade/dashboard");
   revalidatePath("/trade/feed");
 }
 

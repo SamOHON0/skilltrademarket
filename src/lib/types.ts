@@ -82,7 +82,11 @@ export interface Job {
   createdAt: string;
 }
 
-/** Job as a trade sees it in the feed: contact fields stripped. */
+/**
+ * Job as a trade sees it in the feed: contact fields and the exact address
+ * (eircode) stripped, coordinates blurred to ~1km so the map shows an area,
+ * never a house, until the lead is unlocked.
+ */
 export type FeedJob = Omit<
   Job,
   | "customerName"
@@ -91,6 +95,7 @@ export type FeedJob = Omit<
   | "manageToken"
   | "consentShareContact"
   | "consentReviewContact"
+  | "eircode"
 > & { unlocked: boolean };
 
 export interface Unlock {

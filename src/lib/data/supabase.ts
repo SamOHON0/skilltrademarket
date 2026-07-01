@@ -33,7 +33,7 @@ import {
   MATCH_RADIUS_KM,
   TIER_RELEASE_OFFSETS_MINUTES,
 } from "../constants";
-import { matchesLocation } from "../geo";
+import { blurCoord, matchesLocation } from "../geo";
 import { geocode } from "../geocode";
 import type { ModerationResult } from "../moderation";
 import { createServiceClient } from "../supabase/server";
@@ -139,9 +139,11 @@ function toFeedJob(job: Job, unlocked: boolean): FeedJob {
     manageToken: _t,
     consentShareContact: _c1,
     consentReviewContact: _c2,
+    eircode: _z,
     ...safe
   } = job;
-  return { ...safe, unlocked };
+  // Blur the pin pre-unlock: area-level accuracy only.
+  return { ...safe, lat: blurCoord(job.lat), lng: blurCoord(job.lng), unlocked };
 }
 
 function visibleAtMs(job: Job, tier: TradesPerson["tier"]): number {

@@ -19,10 +19,46 @@ import {
   TIER_RELEASE_OFFSETS_MINUTES,
   UNLOCK_ALLOWANCES_MONTHLY,
 } from "../constants";
-import { matchesLocation } from "../geo";
+import { blurCoord, matchesLocation } from "../geo";
 import type { ModerationResult } from "../moderation";
 
 // ---------- seed data ----------
+
+// Category-specific questions. Kept in lockstep with supabase/seed.sql so the
+// mock and live post-a-job flows ask the same things.
+const CATEGORY_QUESTIONS: Record<string, TradeCategory["questions"]> = {
+  plumbing: [
+    { key: "job_type", label: "What kind of plumbing job?", type: "select", options: ["Leak or burst pipe", "Bathroom installation", "Boiler or heating", "Tap or toilet repair", "Other"] },
+    { key: "property_type", label: "Property type", type: "select", options: ["House", "Apartment", "Commercial"] },
+  ],
+  electrical: [
+    { key: "job_type", label: "What kind of electrical work?", type: "select", options: ["Sockets or switches", "Lighting", "Fuse board", "EV charger", "Rewiring", "Safety cert", "Other"] },
+    { key: "property_type", label: "Property type", type: "select", options: ["House", "Apartment", "Commercial"] },
+  ],
+  carpentry: [
+    { key: "job_type", label: "What kind of carpentry?", type: "select", options: ["Doors or frames", "Built-in storage", "Flooring", "Decking", "Furniture repair", "Other"] },
+  ],
+  painting: [
+    { key: "scope", label: "What needs painting?", type: "select", options: ["One room", "Several rooms", "Whole interior", "Exterior", "Other"] },
+    { key: "prep", label: "Any prep needed (wallpaper removal, repairs)?", type: "select", options: ["Yes", "No", "Not sure"] },
+  ],
+  tiling: [
+    { key: "area", label: "Where is the tiling?", type: "select", options: ["Bathroom", "Kitchen", "Floor", "Outdoor", "Other"] },
+    { key: "size", label: "Rough area size", type: "select", options: ["Small (under 5 sqm)", "Medium (5-15 sqm)", "Large (over 15 sqm)", "Not sure"] },
+  ],
+  plastering: [
+    { key: "job_type", label: "What kind of plastering?", type: "select", options: ["Skim coat", "Patch repair", "Full room", "External render", "Other"] },
+  ],
+  roofing: [
+    { key: "job_type", label: "What kind of roofing work?", type: "select", options: ["Leak repair", "Tile or slate replacement", "Flat roof", "Gutters and fascia", "Full reroof", "Other"] },
+  ],
+  landscaping: [
+    { key: "job_type", label: "What kind of work?", type: "select", options: ["Garden maintenance", "Patio or paving", "Decking", "Fencing", "Full redesign", "Other"] },
+  ],
+  handyman: [
+    { key: "job_type", label: "Briefly, what kind of jobs?", type: "select", options: ["Assembly", "Repairs", "Hanging and fixing", "Odd jobs list", "Other"] },
+  ],
+};
 
 const categories: TradeCategory[] = [
   ["plumbing", "Plumbing"],
@@ -39,14 +75,7 @@ const categories: TradeCategory[] = [
   name,
   sortOrder: i + 1,
   active: true,
-  questions: [
-    {
-      key: "job_type",
-      label: `What kind of ${name.toLowerCase()} work?`,
-      type: "select" as const,
-      options: ["Repair", "New installation", "Maintenance", "Other"],
-    },
-  ],
+  questions: CATEGORY_QUESTIONS[slug] ?? [],
 }));
 
 const minsAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
@@ -264,10 +293,14 @@ function toFeedJob(job: Job, tradeId: string): FeedJob {
     manageToken: _t,
     consentShareContact: _c1,
     consentReviewContact: _c2,
+    eircode: _z,
     ...safe
   } = job;
   return {
     ...safe,
+    // Blur the pin pre-unlock: area-level accuracy only.
+    lat: blurCoord(job.lat),
+    lng: blurCoord(job.lng),
     unlocked: db.unlocks.some((u) => u.jobId === job.id && u.tradeId === tradeId),
   };
 }
@@ -374,6 +407,11 @@ export const mockStore: DataStore = {
         success: false,
         reason: job.status === "fully_claimed" ? "fully_claimed" : "not_available",
       };
+    // Expired jobs are dead leads (mirrors the expiry check in unlock_job()).
+    if (job.expiresAt && Date.now() > new Date(job.expiresAt).getTime()) {
+      job.status = "expired";
+      return { success: false, reason: "not_available" };
+    }
     if (Date.now() < visibleAt(job, trade.tier))
       return { success: false, reason: "not_yet_visible" };
 

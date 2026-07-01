@@ -1,12 +1,12 @@
 # Skill Trade
 
-Two-sided trades marketplace for Ireland. Customers post jobs free; subscribed tradespeople race to unlock them (first 5 get contact details). Built by SquareTwo for James Atkinson. Full spec: `Skill_Trade_PRD.md`.
+Two-sided trades marketplace for Ireland. Customers post home-improvement jobs free; subscribed local tradespeople pay to unlock leads and contact customers directly. No commission, no dead leads, hard cap of five trades per job. Built by SquareTwo for James Atkinson. Full spec: `Skill_Trade_PRD.md`.
 
-**Stack:** Next.js 15 (App Router) / Supabase / Vercel / Stripe / Tailwind 4
+**Stack:** Next.js 15 (App Router, Server Components, Server Actions) / TypeScript strict / Tailwind CSS 4 / Supabase (Postgres) / Vercel
 
-## Status: Phase 1 Foundation
+## Status: Phase 2 core loop, complete
 
-Running entirely on a mock in-memory data layer so every flow is demoable before Supabase is connected. All PRD [DECISION] recommendations are implemented as defaults and are tunable (see `src/lib/constants.ts` and the `platform_settings` table).
+The full loop works end to end on either data source: post a job, matching, tiered release, atomic capped unlock, contact handoff, customer job management, trade dashboard. Phase 1 (secure trade accounts via Supabase Auth) is live underneath it.
 
 ## Run it
 
@@ -15,40 +15,41 @@ npm install
 npm run dev
 ```
 
+By default `DATA_SOURCE=mock`: an in-memory store seeded with demo trades and jobs, so every flow is demoable with zero setup. Flip to the live database by setting `DATA_SOURCE=supabase` in `.env.local` (see below). The app only ever talks to the `DataStore` interface (`src/lib/data/index.ts`); no page knows which backend is live.
+
 | Route | What |
 |---|---|
 | `/` | Landing + category grid |
-| `/post-job` | 5-step guided customer flow (consent capture included) |
-| `/jobs/[token]` | Customer's no-account job management page |
-| `/trade/feed` | Trade job feed with live unlock mechanic. Demo as different tiers via `?as=trade-1` (Elite), `?as=trade-2` (Pro), `?as=trade-3` (Basic). Tier release offsets apply for real, so seeded fresh jobs are invisible to lower tiers. |
+| `/post-job` | 6-step guided customer flow: Trade, Details (category-specific questions), Location, Timing, Contact, Review |
+| `/jobs/[token]` | Customer's private no-account job management page: status timeline, claimants, map, complete/cancel |
+| `/trade/feed` | Personalised job feed with the unlock mechanic. In mock mode, demo tiers via `?as=trade-1` (Elite), `?as=trade-2` (Pro), `?as=trade-3` (Basic). Tier release offsets apply for real, so fresh seeded jobs are invisible to lower tiers. |
+| `/trade/dashboard` | Stats, unlocked jobs with contact buttons + won/lost/completed outcomes, profile summary |
+| `/trade/signup`, `/login` | Trade accounts (Supabase mode) |
 | `/pricing` | Tier matrix (Stripe checkout = Phase 3) |
-| `/admin` | Dashboard, job approval queue, trades, review moderation |
+| `/admin` | Dashboard, job queue, trades, reports, review moderation (allowlist via `ADMIN_EMAILS`) |
 
-## Connecting Supabase
+## Flipping DATA_SOURCE
 
-1. Create project, apply `supabase/migrations/0001_initial_schema.sql` then `supabase/seed.sql`
-2. `npm i @supabase/supabase-js @supabase/ssr`
-3. Copy `.env.example` to `.env.local`, fill keys, set `DATA_SOURCE=supabase`
-4. Implement `src/lib/data/supabase.ts` (method-by-method mapping notes are in the file) and flip the export in `src/lib/data/index.ts`
+1. Create a Supabase project, apply `supabase/migrations/0001` through `0006` in order, then `supabase/seed.sql` (categories). `supabase/seed_dev.sql` is optional demo data; never in production.
+2. Copy `.env.example` to `.env.local`, fill the Supabase keys, set `DATA_SOURCE=supabase`.
+3. Restart dev. Same UI, live Postgres.
 
-The app only ever talks to the `DataStore` interface (`src/lib/data/index.ts`), so no page changes are needed for the swap.
+If you already applied 0001-0005, `0006_phase2_hardening.sql` is the only new migration: expiry enforced inside `unlock_job()`, `job_feed()` updated to radius matching + coordinate blurring, and an `expire_jobs()` sweep you can call from a cron.
 
-### What the SQL already handles
+## How the core loop is enforced (where the guarantees live)
 
-- **Atomic 5-cap unlock**: `unlock_job()` Postgres function with a row lock. Two simultaneous taps can never become unlock #5 and #6 (PRD 8.1).
-- **Tier early access server-side**: Elite T+0, Pro T+30, Basic T+60, read from `platform_settings`, enforced in both `unlock_job()` and the `job_feed()` function.
-- **Contact data protection (GDPR)**: RLS on everything; trades never select `jobs` directly. The feed function strips contact fields; only an unlock row exposes them.
-- **Monthly unlock allowances**: Basic 10 / Pro 25 / Elite unlimited, in `platform_settings`. Needs James's sign-off (PRD open item 5).
-- **Admin-tunable settings**: offsets, allowances, cap, expiry, points formula all in `platform_settings`, no redeploys.
+- **Atomic 5-cap**: `unlock_job()` Postgres function takes a row lock on the job. Two simultaneous taps can never become #5 and #6. Never enforced in app code; the mock mirrors the same rule order so the UI behaves identically.
+- **Tier release windows**: Elite T+0, Pro T+30m, Basic T+60m, read from `platform_settings`, enforced in `unlock_job()` server-side and filtered in the feed.
+- **Monthly allowances**: Basic 10 / Pro 25 / Elite unlimited, enforced in `unlock_job()`.
+- **Expiry**: jobs die 7 days after release. Filtered from feeds, refused at unlock (and flipped to `expired` under the lock), `expire_jobs()` sweeps stale rows for admin views.
+- **Privacy by design**: trade-facing payloads (`FeedJob`) strip customer name/phone/email, the manage token, and the eircode, and blur coordinates to ~1km. Exact pin and contact details exist only behind an unlock row. Geocoding (Nominatim, cached on the row) and every external call fail soft to county matching.
+- **Matching**: category + travel radius (5-100km or anywhere in Ireland), county fallback when either side lacks coordinates.
 
-## Decisions baked in (PRD recommendations)
+## Verification
 
-No customer accounts (manage-token per job) / admin approval queue before jobs go live / county-based matching, multi-county / pure tier offsets / 7-day expiry with 48h escalation flag / post-then-moderate reviews / unverified trades can unlock / both consent checkboxes captured at job post.
+- `npx tsc -p tsconfig.check.json --noEmit` clean, `next build` passing.
+- Scripted walk of the loop against the mock store (post, tier visibility, unlock to cap, 6th refused, allowance, contact stripping pre-unlock, complete) plus a manual browser pass of every page.
 
 ## Not in this phase
 
-Supabase Auth wiring (placeholder noted in `src/app/admin/layout.tsx` and `src/lib/data/supabase.ts`), Stripe (Phase 3), reviews submission + leaderboard + raffle tool + boosts (Phase 4), photo uploads, email notifications.
-
-## Before the foundation walkthrough with James
-
-Open items 1 to 15 in PRD section 10, especially: unlock allowances sign-off, the "messages" interpretation in writing, and the final launch trades list (seed list in `supabase/seed.sql` is the suggested 9).
+Stripe billing (Phase 3), reviews submission + leaderboard + raffle + boosts (Phase 4), photo uploads, email/WhatsApp notifications, profile editing.

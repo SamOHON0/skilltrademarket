@@ -24,6 +24,7 @@ export default function PostJobForm({
   initialCategory?: string;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const stepHeadingRef = useRef<HTMLParagraphElement>(null);
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState(
     categories.some((c) => c.slug === initialCategory) ? initialCategory! : ""
@@ -46,11 +47,22 @@ export default function PostJobForm({
     if (stepIdx === 2 && !get("county")) e.county = "Choose the county.";
     if (stepIdx === 4) {
       if (!get("customerName")) e.customerName = "Add your name.";
-      if (!get("customerPhone") && !get("customerEmail"))
-        e.customerContact = "Add a phone number or email so trades can reach you.";
+      const phone = get("customerPhone");
       const email = get("customerEmail");
+      const preferred = get("preferredContact");
+      if (!phone && !email)
+        e.customerContact = "Add a phone number or email so trades can reach you.";
+      if (phone) {
+        const digits = phone.replace(/\D/g, "");
+        if (digits.length < 7 || digits.length > 15)
+          e.customerPhone = "That phone number does not look right.";
+      }
       if (email && !EMAIL_RE.test(email))
         e.customerEmail = "That email address does not look right.";
+      if (preferred === "whatsapp" && !phone)
+        e.customerContact = "WhatsApp needs a phone number. Add one or pick email.";
+      if (preferred === "email" && !email)
+        e.customerContact = "Add an email address, or pick phone or WhatsApp.";
       if (fd.get("consentShareContact") !== "on")
         e.consent = "Please confirm you are happy to be contacted.";
     }
@@ -65,6 +77,12 @@ export default function PostJobForm({
     setValues((prev) => ({ ...prev, ...next }));
   }
 
+  // Keyboard and screen-reader users land back at the step indicator on
+  // every step change instead of being stranded mid-form.
+  function focusStepHeading() {
+    requestAnimationFrame(() => stepHeadingRef.current?.focus());
+  }
+
   function goNext() {
     if (!formRef.current) return;
     const fd = new FormData(formRef.current);
@@ -73,16 +91,21 @@ export default function PostJobForm({
     if (Object.keys(e).length > 0) return;
     capture(fd);
     setStep((s) => Math.min(STEPS.length - 1, s + 1));
+    focusStepHeading();
   }
 
   function goBack() {
     setErrors({});
     setStep((s) => Math.max(0, s - 1));
+    focusStepHeading();
   }
 
   const reviewRows: [string, string][] = [
     ["Trade", selected?.name ?? "—"],
     ["Title", values.title || "—"],
+    ...(selected?.questions ?? [])
+      .filter((q) => values[`answer_${q.key}`])
+      .map((q): [string, string] => [q.label, values[`answer_${q.key}`]]),
     ["Location", [values.town, values.county].filter(Boolean).join(", ") || "—"],
     ["Eircode", values.eircode || "—"],
     ["Timing", URGENCY_LABELS[values.urgency ?? "flexible"] ?? "—"],
@@ -113,7 +136,11 @@ export default function PostJobForm({
             />
           ))}
         </ol>
-        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-ink/50">
+        <p
+          ref={stepHeadingRef}
+          tabIndex={-1}
+          className="mt-2 text-xs font-semibold uppercase tracking-wide text-ink/50 focus:outline-none"
+        >
           Step {step + 1} of {STEPS.length} · {STEPS[step]}
         </p>
       </div>
@@ -360,7 +387,10 @@ export default function PostJobForm({
       </div>
 
       {state.error && (
-        <p className="rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700">
+        <p
+          role="alert"
+          className="rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700"
+        >
           {state.error}
         </p>
       )}

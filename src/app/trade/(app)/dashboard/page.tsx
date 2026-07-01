@@ -9,6 +9,7 @@ import UrgencyBadge from "@/components/UrgencyBadge";
 import JobMap from "@/components/JobMap";
 import ReportLeadButton from "@/components/ReportLeadButton";
 import { jobDistanceKm, effectiveRadiusKm } from "@/lib/geo";
+import { kmLabel } from "@/lib/format";
 import {
   MATCH_RADIUS_KM,
   TIER_LABELS,
@@ -18,11 +19,11 @@ import {
 
 export const metadata = { title: "Dashboard | Skill Trade" };
 
-const OUTCOMES = ["won", "lost", "completed"] as const;
-
-function kmLabel(km: number): string {
-  return km < 10 ? `${km.toFixed(1)} km away` : `${Math.round(km)} km away`;
-}
+const OUTCOMES: { value: string; label: string }[] = [
+  { value: "won", label: "Won" },
+  { value: "lost", label: "Lost" },
+  { value: "completed", label: "Completed" },
+];
 
 export default async function DashboardPage() {
   const supabaseMode = process.env.DATA_SOURCE === "supabase";
@@ -205,25 +206,31 @@ export default async function DashboardPage() {
                     )}
                     <form
                       action={setOutcomeAction}
-                      className="mt-3 flex items-center gap-2"
+                      className="mt-3 flex flex-wrap items-center gap-2"
                     >
                       <input type="hidden" name="unlockId" value={u.id} />
-                      <span className="text-xs text-ink/50">Outcome:</span>
-                      <select
-                        name="outcome"
-                        defaultValue={u.outcome}
-                        className="rounded-lg border border-ink/20 bg-white px-2 py-1 text-sm"
-                      >
-                        <option value="none">Not set</option>
-                        {OUTCOMES.map((o) => (
-                          <option key={o} value={o}>
-                            {o}
-                          </option>
-                        ))}
-                      </select>
-                      <button className="rounded-lg border border-ink/20 px-3 py-1 text-sm font-medium hover:bg-paper">
-                        Save
-                      </button>
+                      <span className="text-xs text-ink/50">
+                        How did it go?
+                      </span>
+                      {OUTCOMES.map((o) => {
+                        const current = u.outcome === o.value;
+                        return (
+                          <button
+                            key={o.value}
+                            name="outcome"
+                            value={current ? "none" : o.value}
+                            aria-pressed={current}
+                            title={current ? "Tap to clear" : `Mark as ${o.label.toLowerCase()}`}
+                            className={`rounded-lg px-3 py-1 text-sm font-medium ${
+                              current
+                                ? "bg-ink text-white"
+                                : "border border-ink/20 hover:bg-paper"
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        );
+                      })}
                     </form>
                     <div className="mt-2">
                       <ReportLeadButton

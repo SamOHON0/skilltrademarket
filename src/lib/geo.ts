@@ -18,6 +18,12 @@ export function distanceKm(
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+// Blur a coordinate to 2 decimal places (~1.1km north-south). Used on
+// trade-facing feed payloads so pre-unlock maps show an area, not a house.
+export function blurCoord(value: number | null): number | null {
+  return value == null ? null : Math.round(value * 100) / 100;
+}
+
 type JobLoc = Pick<Job, "lat" | "lng" | "county">;
 type TradeLoc = Pick<
   TradesPerson,

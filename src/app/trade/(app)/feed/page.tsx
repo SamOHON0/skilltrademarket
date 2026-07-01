@@ -9,6 +9,7 @@ import {
   MATCH_RADIUS_KM,
 } from "@/lib/constants";
 import { jobDistanceKm, effectiveRadiusKm } from "@/lib/geo";
+import { expiryLabel, kmLabel, timeAgo } from "@/lib/format";
 import UnlockButton from "./UnlockButton";
 import ContactButtons from "@/components/ContactButtons";
 import UrgencyBadge from "@/components/UrgencyBadge";
@@ -21,10 +22,6 @@ const DEMO_TRADES = [
   { id: "trade-2", label: "trade-2" },
   { id: "trade-3", label: "trade-3" },
 ];
-
-function kmLabel(km: number): string {
-  return km < 10 ? `${km.toFixed(1)} km away` : `${Math.round(km)} km away`;
-}
 
 export default async function FeedPage({
   searchParams,
@@ -73,6 +70,13 @@ export default async function FeedPage({
   const feed = trade ? await store.getFeed(tradeId) : [];
   const unlocks = trade ? await store.getUnlocks(tradeId) : [];
   const allowance = trade ? UNLOCK_ALLOWANCES_MONTHLY[trade.tier] : null;
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const usedThisMonth = unlocks.filter(
+    (u) => new Date(u.unlockedAt) >= monthStart
+  ).length;
+  const unlocksLeft = allowance === null ? null : Math.max(0, allowance - usedThisMonth);
   const pending = trade
     ? trade.status !== "active" || !trade.subscriptionActive
     : false;
@@ -96,7 +100,7 @@ export default async function FeedPage({
               &middot; {trade.counties.join(", ")} &middot;{" "}
               {allowance === null
                 ? "Unlimited unlocks"
-                : `${allowance} unlocks/month`}
+                : `${unlocksLeft} of ${allowance} unlocks left this month`}
             </p>
           )}
         </div>
@@ -144,8 +148,16 @@ export default async function FeedPage({
           const slotsLeft = 5 - job.unlockCount;
           const myUnlock = unlocks.find((u) => u.jobId === job.id);
           const dist = trade ? jobDistanceKm(job, trade) : null;
+          const expiry = expiryLabel(job.expiresAt);
+          const claimedOut = slotsLeft <= 0 && !myUnlock;
+          // Exact pin once unlocked; blurred area (no pin) before that.
+          const mapLat = myUnlock?.job.lat ?? job.lat;
+          const mapLng = myUnlock?.job.lng ?? job.lng;
           return (
-            <div key={job.id} className="rounded-xl bg-white p-5 shadow-sm">
+            <div
+              key={job.id}
+              className={`rounded-xl bg-white p-5 shadow-sm ${claimedOut ? "opacity-60" : ""}`}
+            >
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -154,9 +166,13 @@ export default async function FeedPage({
                   </div>
                   <p className="mt-1 text-sm text-ink/70">
                     {[job.town, job.county].filter(Boolean).join(", ")}
-                    {dist != null ? ` · ${kmLabel(dist)}` : ""} &middot;{" "}
+                    {dist != null ? ` · ${kmLabel(dist, !myUnlock)}` : ""} &middot;{" "}
                     {URGENCY_LABELS[job.urgency]}
                     {job.budgetBand ? <> &middot; {job.budgetBand}</> : null}
+                  </p>
+                  <p className="mt-1 text-xs text-ink/50">
+                    Posted {timeAgo(job.createdAt)}
+                    {expiry ? <> &middot; {expiry}</> : null}
                   </p>
                   {job.description && (
                     <p className="mt-2 text-sm text-ink/80">{job.description}</p>
@@ -170,20 +186,25 @@ export default async function FeedPage({
                   }`}
                 >
                   {slotsLeft > 0
-                    ? `${job.unlockCount} of 5 unlocked`
+                    ? `${slotsLeft} of 5 slots left`
                     : "Fully claimed"}
                 </span>
               </div>
 
-              {job.lat != null && job.lng != null && (
+              {mapLat != null && mapLng != null && (
                 <div className="mt-3">
                   <JobMap
-                    lat={job.lat}
-                    lng={job.lng}
+                    lat={mapLat}
+                    lng={mapLng}
                     marker={!!myUnlock}
                     className="h-40"
                     label={`${job.town ?? job.county} area`}
                   />
+                  {!myUnlock && (
+                    <p className="mt-1 text-[11px] text-ink/40">
+                      Approximate area. Exact location shows after you unlock.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -205,7 +226,8 @@ export default async function FeedPage({
                   <UnlockButton
                     jobId={job.id}
                     tradeId={tradeId}
-                    disabled={slotsLeft <= 0}
+                    disabled={claimedOut || pending}
+                    unlocksLeft={unlocksLeft}
                   />
                 )}
               </div>
